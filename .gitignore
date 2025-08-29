@@ -1,0 +1,4 @@
+files-to-prompt
+**/*.rs.bk
+debug
+target
