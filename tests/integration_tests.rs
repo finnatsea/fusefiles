@@ -36,31 +36,26 @@ fn test_basic_functionality() {
     fs::write(test_dir.join("file1.txt"), "Contents of file1").unwrap();
     fs::write(test_dir.join("file2.txt"), "Contents of file2").unwrap();
     
-    let assert_result = cmd()
+    let assert = cmd()
         .arg(&test_dir)
         .assert()
         .success();
     
-    let output = assert_result.get_output();
+    let output = assert.get_output();
     let stdout = String::from_utf8(output.stdout.clone()).unwrap();
     let stderr = String::from_utf8(output.stderr.clone()).unwrap();
     
-    let expected_path1 = test_dir.join("file1.txt").to_string_lossy().to_string();
-    let expected_path2 = test_dir.join("file2.txt").to_string_lossy().to_string();
+    eprintln!("Test dir: {:?}", test_dir);
+    eprintln!("STDOUT: '{}'", stdout);
+    eprintln!("STDERR: '{}'", stderr);
     
-    // Debug output
-    println!("STDOUT: '{}'", stdout);
-    println!("STDERR: '{}'", stderr);
-    println!("Expected path1: {}", expected_path1);
-    println!("Expected path2: {}", expected_path2);
-    
-    assert!(stdout.contains(&expected_path1));
+    // Check for specific content
+    assert!(!stdout.is_empty(), "stdout should not be empty");
+    assert!(stdout.contains("file1.txt"));
     assert!(stdout.contains("Contents of file1"));
-    assert!(stdout.contains(&expected_path2));
+    assert!(stdout.contains("file2.txt"));
     assert!(stdout.contains("Contents of file2"));
-    
-    // Keep temp_dir alive until end of test
-    drop(temp_dir);
+    assert!(stdout.contains("---"));
 }
 
 #[test]

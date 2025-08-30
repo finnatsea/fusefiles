@@ -9,73 +9,180 @@ use crate::{Result, FileProcessor};
 use crate::output::{DefaultFormatter, XmlFormatter, MarkdownFormatter};
 use crate::utils::read_paths_from_stdin;
 
-/// files-to-prompt: Concatenate a directory full of files into a single prompt for use with LLMs
+/// files-to-prompt: Turn many files -> single file, useful for LLM prompting
 #[derive(Parser)]
 #[command(name = "files-to-prompt")]
-#[command(about = "Concatenate a directory full of files into a single prompt for use with LLMs")]
+#[command(about = "Turn many files -> single file, useful for LLM prompting.")]
+#[command(long_about = r#"Turn many files -> single file, useful for LLM prompting.
+
+Usage:
+  files-to-prompt [path/to/file_or_directory] [options]
+
+Here's a few samples to get started:
+  files-to-prompt src/                                      # All files in src/
+  files-to-prompt src/ test/ -e ts                          # All ts files in src/ and test
+  files-to-prompt hello.text test/ -e rs -e toml            # hello file and .rs and .toml files in test
+  files-to-prompt . --ignore "*.log" --ignore "test_*"      # Skip logs and files that start with "test_"
+  files-to-prompt . -o output.txt                           # Save to file instead of printing or use >
+
+For a full list of options, run `files-to-prompt help`."#)]
 #[command(version)]
+#[command(disable_help_flag = true)]
+#[command(disable_version_flag = true)]
 pub struct Cli {
-    /// Paths to files or directories
+    /// Files or directories to include
     #[arg(value_name = "PATHS")]
     pub paths: Vec<PathBuf>,
     
-    /// Only include files with specified extensions
-    #[arg(short = 'e', long = "extension", action = clap::ArgAction::Append)]
+    /// Show full help message
+    #[arg(long = "help", short = 'h', action = clap::ArgAction::Help)]
+    pub help: Option<bool>,
+    
+    // Input Control
+    /// Only include these extensions (e.g. -e py -e js)
+    #[arg(short = 'e', long = "extension", action = clap::ArgAction::Append, value_name = "EXT", help_heading = "Input Control")]
     pub extensions: Vec<String>,
     
-    /// Include files and folders starting with .
-    #[arg(long = "include-hidden")]
+    /// Include hidden files (starting with .)
+    #[arg(long = "include-hidden", help_heading = "Input Control")]
     pub include_hidden: bool,
     
-    /// --ignore option only ignores files
-    #[arg(long = "ignore-files-only")]
+    /// Make --ignore patterns skip files only, not directories
+    #[arg(long = "ignore-files-only", help_heading = "Input Control")]
     pub ignore_files_only: bool,
     
-    /// Ignore .gitignore files and include all files
-    #[arg(long = "ignore-gitignore")]
+    /// Don't use .gitignore rules
+    #[arg(long = "ignore-gitignore", help_heading = "Input Control")]
     pub ignore_gitignore: bool,
     
-    /// List of patterns to ignore
-    #[arg(long = "ignore", action = clap::ArgAction::Append)]
+    /// Skip files matching pattern (*.log, test_*, *foo*, __pycache__)
+    #[arg(long = "ignore", action = clap::ArgAction::Append, value_name = "PATTERN", help_heading = "Input Control")]
     pub ignore_patterns: Vec<String>,
     
-    /// Output to a file instead of stdout
-    #[arg(short = 'o', long = "output")]
-    pub output_file: Option<PathBuf>,
-    
-    /// Output in XML-ish format suitable for Claude
-    #[arg(short = 'c', long = "cxml")]
+    // Output Format
+    /// Output in Claude XML format
+    #[arg(short = 'c', long = "cxml", help_heading = "Output Format")]
     pub claude_xml: bool,
     
-    /// Output Markdown with fenced code blocks
-    #[arg(short = 'm', long = "markdown")]
+    /// Output as Markdown code blocks
+    #[arg(short = 'm', long = "markdown", help_heading = "Output Format")]
     pub markdown: bool,
     
-    /// Add line numbers to the output
-    #[arg(short = 'n', long = "line-numbers")]
+    /// Add line numbers
+    #[arg(short = 'n', long = "line-numbers", help_heading = "Output Format")]
     pub line_numbers: bool,
     
-    /// Use NUL character as separator when reading from stdin
-    #[arg(short = '0', long = "null")]
+    /// Save to file instead of printing
+    #[arg(short = 'o', long = "output", value_name = "FILE", help_heading = "Output Format")]
+    pub output_file: Option<PathBuf>,
+    
+    // Other
+    /// Read null-separated paths from stdin
+    #[arg(short = '0', long = "null", help_heading = "Other")]
     pub null_separator: bool,
+    
+    /// Print version
+    #[arg(short = 'V', long = "version", action = clap::ArgAction::Version, help_heading = "Other")]
+    pub version: Option<bool>,
+}
+
+fn print_short_help() {
+    println!(r#"Turn many files -> single file, useful for LLM prompting.
+
+Usage:
+  files-to-prompt [path/to/file_or_directory] [options]
+
+Here's a few samples to get started:
+  files-to-prompt src/                                      # All files in src/
+  files-to-prompt src/ test/ -e ts                          # All ts files in src/ and test
+  files-to-prompt hello.text test/ -e rs -e toml            # hello file and .rs and .toml files in test
+  files-to-prompt . --ignore "*.log" --ignore "test_*"      # Skip logs and files that start with "test_"
+  files-to-prompt . -o output.txt                           # Save to file instead of printing or use >
+
+For a full list of options, run `files-to-prompt --help`."#);
+}
+
+fn print_full_help() {
+    println!(r#"Turn many files -> single file, useful for LLM prompting.
+
+Usage:
+  files-to-prompt [path/to/file_or_directory] [options]
+
+Here's a few samples to get started:
+  files-to-prompt src/                                      # All files in src/
+  files-to-prompt src/ test/ -e ts                          # All ts files in src/ and test
+  files-to-prompt hello.text test/ -e rs -e toml            # hello file and .rs and .toml files in test
+  files-to-prompt . --ignore "*.log" --ignore "test_*"      # Skip logs and files that start with "test_"
+  files-to-prompt . -o output.txt                           # Save to file instead of printing or use >
+
+For a full list of options, run `files-to-prompt --help`.
+
+OPTIONS
+Input Control:
+  -e, --extension <EXT>     Only include these extensions (e.g. -e py -e js)
+      --include-hidden      Include hidden files (starting with .)
+      --ignore-files-only   Make --ignore patterns skip files only, not directories
+      --ignore-gitignore    Don't use .gitignore rules
+      --ignore <PATTERN>    Skip files matching pattern (*.log, test_*, *foo*, __pycache__)
+
+Output Format:
+  -c, --cxml               Output in Claude XML format
+  -m, --markdown           Output as Markdown code blocks
+  -n, --line-numbers       Add line numbers
+  -o, --output <FILE>      Save to file instead of printing
+
+Other:
+  -0, --null               Read null-separated paths from stdin
+  -h, --help               Print help
+  -V, --version            Print version
+
+Pattern Usage:
+  --ignore "test_*"        → Matches: test_utils.py, test_data.json
+  --ignore "*.log"         → Matches: debug.log, error.log
+  --ignore "*foo*"         → Matches: foo.txt, config_foo_bar.xml
+  --ignore "__init__.py"   → Matches: any file/folder named exactly "__init__.py""#);
 }
 
 /// Main entry point for the CLI application
 pub fn run() -> Result<()> {
-    let args = Cli::parse();
+    let raw_args: Vec<String> = std::env::args().collect();
     
-    // Read paths from stdin if available
-    let stdin_paths = read_paths_from_stdin(args.null_separator)?;
+    // Handle special cases before parsing
+    if raw_args.len() == 1 {
+        // No arguments provided, show short help
+        print_short_help();
+        return Ok(());
+    }
+    
+    // Check for help argument
+    if raw_args.iter().any(|arg| arg == "help" || arg == "--help" || arg == "-h") {
+        print_full_help();
+        return Ok(());
+    }
+    
+    // Check for version argument
+    if raw_args.iter().any(|arg| arg == "--version" || arg == "-V") {
+        println!("{}", env!("CARGO_PKG_VERSION"));
+        return Ok(());
+    }
+    
+    let args = Cli::parse();
     
     // Combine paths from arguments and stdin
     let mut all_paths = args.paths.clone();
-    for path in stdin_paths {
-        all_paths.push(PathBuf::from(path));
+    
+    // Only read from stdin if no paths were provided via command line
+    // This prevents stdin from being read when paths are already specified
+    if all_paths.is_empty() {
+        let stdin_paths = read_paths_from_stdin(args.null_separator)?;
+        for path in stdin_paths {
+            all_paths.push(PathBuf::from(path));
+        }
     }
     
     // Validate that we have at least one path
     if all_paths.is_empty() {
-        eprintln!("No paths provided. Please specify files or directories to process.");
+        print_short_help();
         std::process::exit(1);
     }
     
