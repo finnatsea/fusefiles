@@ -4,19 +4,33 @@ A Rust CLI tool that concatenates files into a single prompt for use with LLMs.
 
 ## How to Use
 
-### How do I build it?
+### Installation
+
+#### Install from crates.io
+
+```bash
+cargo install files-to-prompt
+```
+
+#### Build and Install from Source
+
+Clone the repository and install:
+
+```bash
+git clone https://github.com/finnatsea/files-to-prompt-rs.git
+cd files-to-prompt-rs
+cargo install --path .
+```
+
+This installs the binary to `~/.cargo/bin/files-to-prompt`, making it available system-wide.
+
+#### Build Only (for development)
 
 ```bash
 cargo build --release
 ```
 
 The executable will be in `target/release/files-to-prompt`.
-
-Or install it via cargo:
-
-```bash
-cargo install files-to-prompt
-```
 
 
 ### How do I use it?
@@ -69,4 +83,32 @@ find . -name "*.rs" | files-to-prompt
 
 # Use with null-separated paths
 find . -name "*.rs" -print0 | files-to-prompt --null
+```
+
+## Development
+
+### Running Tests
+
+```bash
+# Run all tests
+cargo test
+
+# Run specific test by name
+cargo test test_basic_functionality
+
+# Run only unit tests
+cargo test --lib
+
+# Run only integration tests
+cargo test --test integration_tests
+```
+
+### Linting and Formatting
+
+```bash
+# Format code
+cargo fmt
+
+# Lint with clippy
+cargo clippy
 ```

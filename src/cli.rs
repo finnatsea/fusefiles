@@ -35,8 +35,8 @@ pub struct Cli {
     pub paths: Vec<PathBuf>,
     
     /// Show full help message
-    #[arg(long = "help", short = 'h', action = clap::ArgAction::Help)]
-    pub help: Option<bool>,
+    #[arg(long = "help", short = 'h')]
+    pub help: bool,
     
     // Input Control
     /// Only include these extensions (e.g. -e py -e js)
