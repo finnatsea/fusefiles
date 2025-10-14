@@ -49,6 +49,21 @@ files-to-prompt . --include-hidden
 # Add line numbers
 files-to-prompt src/main.rs -n
 
+# Add a table of contents tree
+files-to-prompt src/ --toc
+
+# Table of contents with directories only
+files-to-prompt src/ --toc-dirs-only
+
+# Table of contents with files and directories
+files-to-prompt src/ --toc-files
+
+# Ignore files only (not directories) with pattern
+files-to-prompt src/ --ignore "*test*" --ignore-files-only
+
+# Ignore .gitignore rules
+files-to-prompt . --ignore-gitignore
+
 # Pipe file paths from another command
 find . -name "*.rs" | files-to-prompt
 
