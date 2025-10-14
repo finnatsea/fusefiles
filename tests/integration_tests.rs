@@ -232,7 +232,7 @@ fn test_multiple_paths() {
     let output = cmd()
         .arg(&test_dir1)
         .arg(&test_dir2)
-        .arg(&temp_dir.path().join("single_file.txt"))
+        .arg(temp_dir.path().join("single_file.txt"))
         .assert()
         .success()
         .get_output()
@@ -335,7 +335,7 @@ fn test_binary_file_warning() {
     fs::create_dir(&test_dir).unwrap();
 
     // Create a binary file
-    fs::write(test_dir.join("binary_file.bin"), &[0xff, 0xfe, 0xfd]).unwrap();
+    fs::write(test_dir.join("binary_file.bin"), [0xff, 0xfe, 0xfd]).unwrap();
     fs::write(test_dir.join("text_file.txt"), "This is a text file").unwrap();
 
     let assert = cmd().arg(&test_dir).assert().success();

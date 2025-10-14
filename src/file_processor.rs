@@ -1,22 +1,22 @@
 //! Core file processing and directory traversal logic
 
-use crate::ignore::IgnoreChecker;
+use crate::ignore::CustomIgnore;
 use crate::output::OutputFormatter;
 use crate::tree::TreeGenerator;
 use crate::{FilesToPromptError, Result, TocMode};
+use ignore::WalkBuilder;
 use std::fs;
+use std::io;
 use std::path::{Path, PathBuf};
-use walkdir::WalkDir;
 
 /// Handles file processing with filtering and directory traversal
 pub struct FileProcessor {
     extensions: Vec<String>,
     include_hidden: bool,
-    ignore_files_only: bool,
     ignore_gitignore: bool,
-    ignore_patterns: Vec<String>,
     line_numbers: bool,
     toc_mode: Option<TocMode>,
+    custom_ignore: CustomIgnore,
 }
 
 impl FileProcessor {
@@ -29,16 +29,17 @@ impl FileProcessor {
         ignore_patterns: Vec<String>,
         line_numbers: bool,
         toc_mode: Option<TocMode>,
-    ) -> Self {
-        Self {
+    ) -> Result<Self> {
+        let custom_ignore = CustomIgnore::new(ignore_patterns, ignore_files_only)?;
+
+        Ok(Self {
             extensions,
             include_hidden,
-            ignore_files_only,
             ignore_gitignore,
-            ignore_patterns,
             line_numbers,
             toc_mode,
-        }
+            custom_ignore,
+        })
     }
 
     /// Process multiple paths and generate output using the specified formatter
@@ -60,9 +61,8 @@ impl FileProcessor {
             let tree_generator = TreeGenerator::new(
                 self.extensions.clone(),
                 self.include_hidden,
-                self.ignore_files_only,
                 self.ignore_gitignore,
-                self.ignore_patterns.clone(),
+                self.custom_ignore.clone(),
             );
 
             let trees = tree_generator.generate_tree(paths)?;
@@ -145,52 +145,24 @@ impl FileProcessor {
         formatter: &mut F,
         output: &mut Vec<String>,
     ) -> Result<()> {
-        let mut ignore_checker = IgnoreChecker::new(self.ignore_files_only);
+        let walker = self.build_walker(dir_path)?;
 
-        // Add custom ignore patterns
-        ignore_checker.add_custom_patterns(&self.ignore_patterns)?;
+        for result in walker {
+            let entry = match result {
+                Ok(entry) => entry,
+                Err(err) => return Err(map_walk_error(err)),
+            };
 
-        // Add gitignore patterns from the base directory if not ignoring them
-        if !self.ignore_gitignore {
-            ignore_checker.add_gitignore_file(&dir_path.join(".gitignore"))?;
-        }
-
-        // Walk the directory tree
-        let walker = WalkDir::new(dir_path)
-            .sort_by_file_name()
-            .into_iter()
-            .filter_entry(|e| {
-                // Filter out hidden directories if not including hidden files
-                // Check only the relative path from dir_path, not the full path
-                if !self.include_hidden {
-                    if let Ok(rel_path) = e.path().strip_prefix(dir_path) {
-                        // Check if any component in the relative path is hidden
-                        if rel_path.components().any(|c| {
-                            if let Some(name) = c.as_os_str().to_str() {
-                                name.starts_with('.') && name != "." && name != ".."
-                            } else {
-                                false
-                            }
-                        }) {
-                            return false;
-                        }
-                    }
-                }
-
-                true
-            });
-
-        for entry in walker {
-            let entry = entry?;
             let path = entry.path();
-
-            // Skip the root directory itself
-            if path == dir_path {
+            if entry.depth() == 0 {
                 continue;
             }
 
-            // Only process files
-            if !path.is_file() {
+            let is_file = entry
+                .file_type()
+                .map(|ft| ft.is_file())
+                .unwrap_or_else(|| path.is_file());
+            if !is_file {
                 continue;
             }
 
@@ -204,13 +176,8 @@ impl FileProcessor {
                 continue;
             }
 
-            // Check gitignore rules if not ignoring them
-            if !self.ignore_gitignore && ignore_checker.should_ignore_gitignore(path) {
-                continue;
-            }
-
             // Check custom ignore patterns for files
-            if ignore_checker.should_ignore_custom(path, true) {
+            if self.custom_ignore.should_ignore_file(path) {
                 continue;
             }
 
@@ -231,6 +198,61 @@ impl FileProcessor {
         }
 
         Ok(())
+    }
+
+    fn build_walker(&self, dir_path: &Path) -> Result<ignore::Walk> {
+        let mut builder = WalkBuilder::new(dir_path);
+        builder.sort_by_file_name(|a, b| a.cmp(b));
+        builder.follow_links(false);
+        if self.include_hidden {
+            builder.hidden(false);
+        }
+
+        if self.ignore_gitignore {
+            builder.git_ignore(false);
+            builder.git_global(false);
+            builder.git_exclude(false);
+            builder.ignore(false);
+            builder.parents(false);
+        } else {
+            builder.git_ignore(true);
+            builder.git_global(true);
+            builder.git_exclude(true);
+            builder.ignore(true);
+            builder.parents(true);
+            builder.require_git(false);
+        }
+
+        let root = dir_path.to_path_buf();
+        let custom_for_dirs = self.custom_ignore.clone();
+        let include_hidden = self.include_hidden;
+        builder.filter_entry(move |entry| {
+            if entry.path() == root {
+                return true;
+            }
+
+            let is_dir = entry.file_type().map(|ft| ft.is_dir()).unwrap_or(false);
+
+            if !include_hidden
+                && is_dir
+                && entry
+                    .path()
+                    .file_name()
+                    .and_then(|name| name.to_str())
+                    .map(|name| name.starts_with('.'))
+                    .unwrap_or(false)
+            {
+                return false;
+            }
+
+            if is_dir && custom_for_dirs.should_ignore_dir(entry.path()) {
+                return false;
+            }
+
+            true
+        });
+
+        Ok(builder.build())
     }
 
     /// Read file content and handle binary files
@@ -277,6 +299,14 @@ impl FileProcessor {
     }
 }
 
+fn map_walk_error(err: ignore::Error) -> FilesToPromptError {
+    if let Some(io_err) = err.io_error() {
+        FilesToPromptError::Io(io::Error::new(io_err.kind(), io_err.to_string()))
+    } else {
+        FilesToPromptError::Io(io::Error::other(err.to_string()))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -294,7 +324,8 @@ mod tests {
             vec![],
             false,
             None,
-        );
+        )
+        .unwrap();
 
         assert!(processor.should_include_file_by_extension(&PathBuf::from("test.txt")));
         assert!(processor.should_include_file_by_extension(&PathBuf::from("test.py")));
@@ -303,7 +334,8 @@ mod tests {
 
     #[test]
     fn test_should_include_file_no_extensions() {
-        let processor = FileProcessor::new(vec![], false, false, false, vec![], false, None);
+        let processor =
+            FileProcessor::new(vec![], false, false, false, vec![], false, None).unwrap();
 
         assert!(processor.should_include_file_by_extension(&PathBuf::from("test.txt")));
         assert!(processor.should_include_file_by_extension(&PathBuf::from("test.py")));
@@ -312,7 +344,8 @@ mod tests {
 
     #[test]
     fn test_is_hidden_file() {
-        let processor = FileProcessor::new(vec![], false, false, false, vec![], false, None);
+        let processor =
+            FileProcessor::new(vec![], false, false, false, vec![], false, None).unwrap();
 
         assert!(processor.is_hidden_file(&PathBuf::from(".hidden")));
         assert!(processor.is_hidden_file(&PathBuf::from(".gitignore")));
@@ -325,7 +358,8 @@ mod tests {
         let file_path = temp_dir.path().join("test.txt");
         fs::write(&file_path, "Hello, world!").unwrap();
 
-        let processor = FileProcessor::new(vec![], false, false, false, vec![], false, None);
+        let processor =
+            FileProcessor::new(vec![], false, false, false, vec![], false, None).unwrap();
         let mut formatter = DefaultFormatter::new();
         let mut output = Vec::new();
 

@@ -1,10 +1,10 @@
 //! Tree generation for directory structure visualization
 
-use crate::ignore::IgnoreChecker;
+use crate::ignore::CustomIgnore;
 use crate::{Result, TocMode};
+use ignore::WalkBuilder;
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
-use walkdir::WalkDir;
 
 /// Represents a node in the directory tree
 #[derive(Debug, Clone)]
@@ -68,25 +68,22 @@ impl TreeNode {
 pub struct TreeGenerator {
     extensions: Vec<String>,
     include_hidden: bool,
-    ignore_files_only: bool,
     ignore_gitignore: bool,
-    ignore_patterns: Vec<String>,
+    custom_ignore: CustomIgnore,
 }
 
 impl TreeGenerator {
     pub fn new(
         extensions: Vec<String>,
         include_hidden: bool,
-        ignore_files_only: bool,
         ignore_gitignore: bool,
-        ignore_patterns: Vec<String>,
+        custom_ignore: CustomIgnore,
     ) -> Self {
         Self {
             extensions,
             include_hidden,
-            ignore_files_only,
             ignore_gitignore,
-            ignore_patterns,
+            custom_ignore,
         }
     }
 
@@ -116,16 +113,6 @@ impl TreeGenerator {
 
     /// Generate tree for a single directory
     fn generate_directory_tree(&self, dir_path: &Path) -> Result<Option<TreeNode>> {
-        let mut ignore_checker = IgnoreChecker::new(self.ignore_files_only);
-
-        // Add custom ignore patterns
-        ignore_checker.add_custom_patterns(&self.ignore_patterns)?;
-
-        // Add gitignore patterns if not ignoring them
-        if !self.ignore_gitignore {
-            ignore_checker.add_gitignore_file(&dir_path.join(".gitignore"))?;
-        }
-
         let dir_name = dir_path
             .file_name()
             .and_then(|n| n.to_str())
@@ -134,71 +121,120 @@ impl TreeGenerator {
 
         let mut root = TreeNode::new(dir_name, dir_path.to_path_buf(), false);
 
-        // Walk directory and build tree
-        let walker = WalkDir::new(dir_path)
-            .sort_by_file_name()
-            .into_iter()
-            .filter_entry(|e| {
-                // Filter out hidden directories if not including hidden files
-                // Check only the relative path from dir_path, not the full path
-                if !self.include_hidden {
-                    if let Ok(rel_path) = e.path().strip_prefix(dir_path) {
-                        // Check if any component in the relative path is hidden
-                        if rel_path.components().any(|c| {
-                            if let Some(name) = c.as_os_str().to_str() {
-                                name.starts_with('.') && name != "." && name != ".."
-                            } else {
-                                false
-                            }
-                        }) {
-                            return false;
-                        }
-                    }
-                }
-                true
-            });
+        let walker = self.build_walker(dir_path)?;
 
-        for entry in walker {
-            let entry = entry?;
-            let entry_path = entry.path();
+        for result in walker {
+            let entry = match result {
+                Ok(entry) => entry,
+                Err(err) => return Err(map_walk_error(err)),
+            };
 
-            #[cfg(test)]
-            println!("Processing path: {:?}", entry_path);
-
-            // Skip the root directory itself
-            if entry_path == dir_path {
-                #[cfg(test)]
-                println!("Skipping root directory");
+            if entry.depth() == 0 {
                 continue;
             }
 
-            // Check if this path should be ignored
-            if self.should_ignore_path(entry_path, &ignore_checker) {
+            let entry_path = entry.path();
+            #[cfg(test)]
+            println!("Processing path: {:?}", entry_path);
+
+            let is_dir = entry
+                .file_type()
+                .map(|ft| ft.is_dir())
+                .unwrap_or_else(|| entry_path.is_dir());
+
+            if !self.include_hidden
+                && entry_path
+                    .file_name()
+                    .and_then(|name| name.to_str())
+                    .map(|name| name.starts_with('.'))
+                    .unwrap_or(false)
+            {
+                #[cfg(test)]
+                println!("Hidden entry skipped: {:?}", entry_path);
+                continue;
+            }
+
+            if is_dir && self.custom_ignore.should_ignore_dir(entry_path) {
                 #[cfg(test)]
                 println!("Path ignored: {:?}", entry_path);
                 continue;
             }
 
-            // For files, check if they meet our criteria
-            if entry_path.is_file() && !self.should_include_file(entry_path) {
+            if !is_dir && self.custom_ignore.should_ignore_file(entry_path) {
+                #[cfg(test)]
+                println!("File ignored by custom rule: {:?}", entry_path);
+                continue;
+            }
+
+            if !is_dir && !self.should_include_file(entry_path) {
                 #[cfg(test)]
                 println!("File criteria not met: {:?}", entry_path);
                 continue;
             }
 
             #[cfg(test)]
-            println!(
-                "Adding to tree: {:?} (is_file: {})",
-                entry_path,
-                entry_path.is_file()
-            );
+            println!("Adding to tree: {:?} (is_file: {})", entry_path, !is_dir);
 
-            // Add to tree
-            self.add_path_to_tree(&mut root, dir_path, entry_path, entry_path.is_file());
+            self.add_path_to_tree(&mut root, dir_path, entry_path, !is_dir);
         }
 
         // Always return the root, even if empty, so tests can see the structure
         Ok(Some(root))
+    }
+
+    fn build_walker(&self, dir_path: &Path) -> Result<ignore::Walk> {
+        let mut builder = WalkBuilder::new(dir_path);
+        builder.sort_by_file_name(|a, b| a.cmp(b));
+        builder.follow_links(false);
+        if self.include_hidden {
+            builder.hidden(false);
+        }
+
+        if self.ignore_gitignore {
+            builder.git_ignore(false);
+            builder.git_global(false);
+            builder.git_exclude(false);
+            builder.ignore(false);
+            builder.parents(false);
+        } else {
+            builder.git_ignore(true);
+            builder.git_global(true);
+            builder.git_exclude(true);
+            builder.ignore(true);
+            builder.parents(true);
+            builder.require_git(false);
+        }
+
+        let root = dir_path.to_path_buf();
+        let custom_for_dirs = self.custom_ignore.clone();
+        let include_hidden = self.include_hidden;
+        builder.filter_entry(move |entry| {
+            if entry.path() == root {
+                return true;
+            }
+
+            let is_dir = entry.file_type().map(|ft| ft.is_dir()).unwrap_or(false);
+
+            if !include_hidden
+                && is_dir
+                && entry
+                    .path()
+                    .file_name()
+                    .and_then(|name| name.to_str())
+                    .map(|name| name.starts_with('.'))
+                    .unwrap_or(false)
+            {
+                return false;
+            }
+
+            if is_dir && custom_for_dirs.should_ignore_dir(entry.path()) {
+                return false;
+            }
+
+            true
+        });
+
+        Ok(builder.build())
     }
 
     /// Add a path to the tree structure
@@ -234,26 +270,6 @@ impl TreeGenerator {
         }
     }
 
-    /// Check if a path should be ignored
-    fn should_ignore_path(&self, path: &Path, ignore_checker: &IgnoreChecker) -> bool {
-        // Check if file is hidden and should be excluded
-        if !self.include_hidden && self.is_hidden_file(path) {
-            return true;
-        }
-
-        // Check gitignore rules if not ignoring them
-        if !self.ignore_gitignore && ignore_checker.should_ignore_gitignore(path) {
-            return true;
-        }
-
-        // Check custom ignore patterns
-        if ignore_checker.should_ignore_custom(path, path.is_file()) {
-            return true;
-        }
-
-        false
-    }
-
     /// Check if a file should be included based on extension filters
     fn should_include_file(&self, path: &Path) -> bool {
         if self.extensions.is_empty() {
@@ -268,14 +284,6 @@ impl TreeGenerator {
         } else {
             false
         }
-    }
-
-    /// Check if a file is hidden (starts with '.')
-    fn is_hidden_file(&self, path: &Path) -> bool {
-        path.file_name()
-            .and_then(|name| name.to_str())
-            .map(|name| name.starts_with('.'))
-            .unwrap_or(false)
     }
 
     /// Render tree to string format
@@ -348,6 +356,16 @@ impl TreeGenerator {
     }
 }
 
+fn map_walk_error(err: ignore::Error) -> crate::FilesToPromptError {
+    use std::io;
+
+    if let Some(io_err) = err.io_error() {
+        crate::FilesToPromptError::Io(io::Error::new(io_err.kind(), io_err.to_string()))
+    } else {
+        crate::FilesToPromptError::Io(io::Error::other(err.to_string()))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -390,9 +408,8 @@ mod tests {
         let generator = TreeGenerator::new(
             vec![],
             false,
-            false,
             true, // ignore gitignore
-            vec![],
+            CustomIgnore::new(vec![], false).unwrap(),
         );
 
         let trees = generator.generate_tree(&[base_path.to_path_buf()]).unwrap();
@@ -409,7 +426,7 @@ mod tests {
         }
 
         assert!(
-            trees.len() >= 1,
+            !trees.is_empty(),
             "Expected at least 1 tree, got {}",
             trees.len()
         );
@@ -417,7 +434,7 @@ mod tests {
         let tree = &trees[0];
         assert!(!tree.is_file);
         assert!(
-            tree.children.len() >= 1,
+            !tree.children.is_empty(),
             "Expected at least 1 child, got {}",
             tree.children.len()
         );
@@ -442,7 +459,12 @@ mod tests {
         root.add_child(file1);
         root.add_child(subdir);
 
-        let generator = TreeGenerator::new(vec![], false, false, true, vec![]);
+        let generator = TreeGenerator::new(
+            vec![],
+            false,
+            true,
+            CustomIgnore::new(vec![], false).unwrap(),
+        );
         let output = generator.render_tree(&[root], TocMode::FilesAndDirs);
 
         assert!(output.contains("root/"));
