@@ -9,11 +9,10 @@ A Rust CLI tool that concatenates files into a single prompt for use with LLMs.
 ```bash
 cargo build --release
 ```
-(the executable will be in `target/release/files-to-prompt`)
 
-/Users/finnianbrown/Developer/kilo-projects/files-to-prompt-rs/target/release/files-to-prompt relab/ > relab-code.txt
+The executable will be in `target/release/files-to-prompt`.
 
-or install it via cargo:
+Or install it via cargo:
 
 ```bash
 cargo install files-to-prompt
