@@ -19,7 +19,10 @@ pub fn get_language_map() -> HashMap<&'static str, &'static str> {
         ("yml", "yaml"),
         ("sh", "bash"),
         ("rb", "ruby"),
-    ].iter().cloned().collect()
+    ]
+    .iter()
+    .cloned()
+    .collect()
 }
 
 /// Get the language name for a given file extension

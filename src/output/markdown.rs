@@ -1,9 +1,9 @@
 //! Markdown output formatter with fenced code blocks
 
-use std::path::Path;
+use crate::extensions::get_language_for_extension;
 use crate::output::OutputFormatter;
 use crate::utils::{add_line_numbers, determine_backtick_count};
-use crate::extensions::get_language_for_extension;
+use std::path::Path;
 
 /// Markdown formatter that outputs files as fenced code blocks:
 /// filename.ext
@@ -11,6 +11,12 @@ use crate::extensions::get_language_for_extension;
 /// content
 /// ```
 pub struct MarkdownFormatter;
+
+impl Default for MarkdownFormatter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
 impl MarkdownFormatter {
     pub fn new() -> Self {
@@ -20,32 +26,36 @@ impl MarkdownFormatter {
 
 impl OutputFormatter for MarkdownFormatter {
     fn format_file(&mut self, path: &Path, content: &str, line_numbers: bool) -> String {
-        let extension = path.extension()
-            .and_then(|e| e.to_str())
-            .unwrap_or("");
+        let extension = path.extension().and_then(|e| e.to_str()).unwrap_or("");
         let language = get_language_for_extension(extension);
-        
+
         let content = if line_numbers {
             add_line_numbers(content)
         } else {
             content.to_string()
         };
-        
+
         // Determine backtick count needed
         let backticks = determine_backtick_count(&content);
-        
-        format!("{}\n{}{}\n{}\n{}",
-            path.display(), backticks, language, content, backticks)
+
+        format!(
+            "{}\n{}{}\n{}\n{}",
+            path.display(),
+            backticks,
+            language,
+            content,
+            backticks
+        )
     }
-    
+
     fn format_table_of_contents(&mut self, toc: &str) -> String {
         format!("# Table of Contents\n\n```\n{}\n```", toc)
     }
-    
+
     fn start_output(&mut self) -> String {
         String::new()
     }
-    
+
     fn end_output(&mut self) -> String {
         String::new()
     }
@@ -61,7 +71,7 @@ mod tests {
         let mut formatter = MarkdownFormatter::new();
         let path = PathBuf::from("test.py");
         let content = "print('hello')";
-        
+
         let result = formatter.format_file(&path, content, false);
         let expected = "test.py\n```python\nprint('hello')\n```";
         assert_eq!(result, expected);
@@ -72,7 +82,7 @@ mod tests {
         let mut formatter = MarkdownFormatter::new();
         let path = PathBuf::from("test.unknown");
         let content = "some content";
-        
+
         let result = formatter.format_file(&path, content, false);
         let expected = "test.unknown\n```\nsome content\n```";
         assert_eq!(result, expected);
@@ -83,7 +93,7 @@ mod tests {
         let mut formatter = MarkdownFormatter::new();
         let path = PathBuf::from("test.md");
         let content = "This has ``` in it";
-        
+
         let result = formatter.format_file(&path, content, false);
         // Should use 4 backticks since content has 3
         assert!(result.contains("````"));
@@ -95,7 +105,7 @@ mod tests {
         let mut formatter = MarkdownFormatter::new();
         let path = PathBuf::from("test.py");
         let content = "line 1\nline 2";
-        
+
         let result = formatter.format_file(&path, content, true);
         assert!(result.contains("```python"));
         assert!(result.contains("1  line 1\n2  line 2"));

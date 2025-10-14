@@ -1,12 +1,12 @@
 //! Core file processing and directory traversal logic
 
-use std::path::{Path, PathBuf};
-use std::fs;
-use walkdir::WalkDir;
-use crate::{Result, FilesToPromptError, TocMode};
 use crate::ignore::IgnoreChecker;
 use crate::output::OutputFormatter;
 use crate::tree::TreeGenerator;
+use crate::{FilesToPromptError, Result, TocMode};
+use std::fs;
+use std::path::{Path, PathBuf};
+use walkdir::WalkDir;
 
 /// Handles file processing with filtering and directory traversal
 pub struct FileProcessor {
@@ -48,7 +48,7 @@ impl FileProcessor {
         formatter: &mut F,
     ) -> Result<String> {
         let mut output = Vec::new();
-        
+
         // Add start output
         let start = formatter.start_output();
         if !start.is_empty() {
@@ -64,10 +64,10 @@ impl FileProcessor {
                 self.ignore_gitignore,
                 self.ignore_patterns.clone(),
             );
-            
+
             let trees = tree_generator.generate_tree(paths)?;
             let toc = tree_generator.render_tree(&trees, toc_mode);
-            
+
             if !toc.is_empty() {
                 let formatted_toc = formatter.format_table_of_contents(&toc);
                 output.push(formatted_toc);
@@ -92,7 +92,7 @@ impl FileProcessor {
     /// Process a single path (file or directory)
     fn process_single_path<F: OutputFormatter>(
         &self,
-        path: &PathBuf,
+        path: &Path,
         formatter: &mut F,
         output: &mut Vec<String>,
     ) -> Result<()> {
@@ -127,7 +127,10 @@ impl FileProcessor {
                 output.push(formatted);
             }
             Err(FilesToPromptError::BinaryFile { path }) => {
-                eprintln!("Warning: Skipping file {} due to UnicodeDecodeError", path.display());
+                eprintln!(
+                    "Warning: Skipping file {} due to UnicodeDecodeError",
+                    path.display()
+                );
             }
             Err(e) => return Err(e),
         }
@@ -143,7 +146,7 @@ impl FileProcessor {
         output: &mut Vec<String>,
     ) -> Result<()> {
         let mut ignore_checker = IgnoreChecker::new(self.ignore_files_only);
-        
+
         // Add custom ignore patterns
         ignore_checker.add_custom_patterns(&self.ignore_patterns)?;
 
@@ -218,7 +221,10 @@ impl FileProcessor {
                     output.push(formatted);
                 }
                 Err(FilesToPromptError::BinaryFile { path }) => {
-                    eprintln!("Warning: Skipping file {} due to UnicodeDecodeError", path.display());
+                    eprintln!(
+                        "Warning: Skipping file {} due to UnicodeDecodeError",
+                        path.display()
+                    );
                 }
                 Err(e) => return Err(e),
             }
@@ -297,15 +303,7 @@ mod tests {
 
     #[test]
     fn test_should_include_file_no_extensions() {
-        let processor = FileProcessor::new(
-            vec![],
-            false,
-            false,
-            false,
-            vec![],
-            false,
-            None,
-        );
+        let processor = FileProcessor::new(vec![], false, false, false, vec![], false, None);
 
         assert!(processor.should_include_file_by_extension(&PathBuf::from("test.txt")));
         assert!(processor.should_include_file_by_extension(&PathBuf::from("test.py")));
@@ -331,7 +329,9 @@ mod tests {
         let mut formatter = DefaultFormatter::new();
         let mut output = Vec::new();
 
-        processor.process_file(&file_path, &mut formatter, &mut output).unwrap();
+        processor
+            .process_file(&file_path, &mut formatter, &mut output)
+            .unwrap();
 
         assert_eq!(output.len(), 1);
         assert!(output[0].contains("test.txt"));

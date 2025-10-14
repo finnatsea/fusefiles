@@ -1,6 +1,6 @@
 # files-to-prompt-rs
 
-A Rust CLI tool that concatenates files into a single prompt for use with LLMs. Inspired by Simon Willson's (files-to-prompt)[https://github.com/simonw/files-to-prompt] but faster and with more features, like including a file tree at the top of the single file.
+A Rust CLI tool that concatenates files into a single prompt for use with LLMs. Inspired by Simon Willison's (files-to-prompt)[https://github.com/simonw/files-to-prompt] but faster and with more features, like including a file tree at the top of the single file.
 
 ## How to Use
 

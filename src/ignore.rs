@@ -1,9 +1,9 @@
 //! Gitignore file parsing and pattern matching logic
 
-use std::path::Path;
-use std::fs;
+use crate::{FilesToPromptError, Result};
 use glob::Pattern;
-use crate::{Result, FilesToPromptError};
+use std::fs;
+use std::path::Path;
 
 /// Handles ignore patterns from gitignore files and custom patterns
 pub struct IgnoreChecker {
@@ -74,7 +74,7 @@ impl IgnoreChecker {
             if patterns.iter().any(|pattern| pattern.matches(filename)) {
                 return true;
             }
-            
+
             // For directories, also check with trailing slash
             if path.is_dir() {
                 let dir_pattern = format!("{}/", filename);
@@ -119,8 +119,10 @@ mod tests {
     #[test]
     fn test_custom_patterns() {
         let mut checker = IgnoreChecker::new(false);
-        checker.add_custom_patterns(&["*.log".to_string(), "temp*".to_string()]).unwrap();
-        
+        checker
+            .add_custom_patterns(&["*.log".to_string(), "temp*".to_string()])
+            .unwrap();
+
         assert!(checker.should_ignore_custom(&PathBuf::from("test.log"), true));
         assert!(checker.should_ignore_custom(&PathBuf::from("temp_file"), true));
         assert!(!checker.should_ignore_custom(&PathBuf::from("test.txt"), true));
@@ -130,7 +132,7 @@ mod tests {
     fn test_ignore_files_only() {
         let mut checker = IgnoreChecker::new(true);
         checker.add_custom_patterns(&["test*".to_string()]).unwrap();
-        
+
         // Should ignore files matching pattern
         assert!(checker.should_ignore_custom(&PathBuf::from("test.txt"), true));
         // Should NOT ignore directories when ignore_files_only is true
@@ -143,9 +145,18 @@ mod tests {
             Pattern::new("*.txt").unwrap(),
             Pattern::new("temp*").unwrap(),
         ];
-        
-        assert!(IgnoreChecker::matches_any_pattern(&PathBuf::from("test.txt"), &patterns));
-        assert!(IgnoreChecker::matches_any_pattern(&PathBuf::from("temp_file"), &patterns));
-        assert!(!IgnoreChecker::matches_any_pattern(&PathBuf::from("test.py"), &patterns));
+
+        assert!(IgnoreChecker::matches_any_pattern(
+            &PathBuf::from("test.txt"),
+            &patterns
+        ));
+        assert!(IgnoreChecker::matches_any_pattern(
+            &PathBuf::from("temp_file"),
+            &patterns
+        ));
+        assert!(!IgnoreChecker::matches_any_pattern(
+            &PathBuf::from("test.py"),
+            &patterns
+        ));
     }
 }

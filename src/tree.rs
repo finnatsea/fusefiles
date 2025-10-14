@@ -1,10 +1,10 @@
 //! Tree generation for directory structure visualization
 
-use std::path::{Path, PathBuf};
-use std::collections::BTreeMap;
-use walkdir::WalkDir;
-use crate::{Result, TocMode};
 use crate::ignore::IgnoreChecker;
+use crate::{Result, TocMode};
+use std::collections::BTreeMap;
+use std::path::{Path, PathBuf};
+use walkdir::WalkDir;
 
 /// Represents a node in the directory tree
 #[derive(Debug, Clone)]
@@ -32,13 +32,22 @@ impl TreeNode {
 
     /// Get the total number of nodes in this tree (including self)
     pub fn count_nodes(&self) -> usize {
-        1 + self.children.values().map(|child| child.count_nodes()).sum::<usize>()
+        1 + self
+            .children
+            .values()
+            .map(|child| child.count_nodes())
+            .sum::<usize>()
     }
 
     /// Get the number of file nodes in this tree
     pub fn count_files(&self) -> usize {
         let self_count = if self.is_file { 1 } else { 0 };
-        self_count + self.children.values().map(|child| child.count_files()).sum::<usize>()
+        self_count
+            + self
+                .children
+                .values()
+                .map(|child| child.count_files())
+                .sum::<usize>()
     }
 
     /// Estimate the number of lines this tree would take to render
@@ -46,8 +55,10 @@ impl TreeNode {
         if !show_files && self.is_file {
             return 0;
         }
-        
-        1 + self.children.values()
+
+        1 + self
+            .children
+            .values()
             .map(|child| child.estimate_render_lines(show_files))
             .sum::<usize>()
     }
@@ -86,7 +97,8 @@ impl TreeGenerator {
         for path in paths {
             if path.is_file() {
                 if self.should_include_file(path) {
-                    let name = path.file_name()
+                    let name = path
+                        .file_name()
                         .and_then(|n| n.to_str())
                         .unwrap_or("?")
                         .to_string();
@@ -105,7 +117,7 @@ impl TreeGenerator {
     /// Generate tree for a single directory
     fn generate_directory_tree(&self, dir_path: &Path) -> Result<Option<TreeNode>> {
         let mut ignore_checker = IgnoreChecker::new(self.ignore_files_only);
-        
+
         // Add custom ignore patterns
         ignore_checker.add_custom_patterns(&self.ignore_patterns)?;
 
@@ -114,11 +126,12 @@ impl TreeGenerator {
             ignore_checker.add_gitignore_file(&dir_path.join(".gitignore"))?;
         }
 
-        let dir_name = dir_path.file_name()
+        let dir_name = dir_path
+            .file_name()
             .and_then(|n| n.to_str())
             .unwrap_or("?")
             .to_string();
-        
+
         let mut root = TreeNode::new(dir_name, dir_path.to_path_buf(), false);
 
         // Walk directory and build tree
@@ -174,7 +187,11 @@ impl TreeGenerator {
             }
 
             #[cfg(test)]
-            println!("Adding to tree: {:?} (is_file: {})", entry_path, entry_path.is_file());
+            println!(
+                "Adding to tree: {:?} (is_file: {})",
+                entry_path,
+                entry_path.is_file()
+            );
 
             // Add to tree
             self.add_path_to_tree(&mut root, dir_path, entry_path, entry_path.is_file());
@@ -185,7 +202,13 @@ impl TreeGenerator {
     }
 
     /// Add a path to the tree structure
-    fn add_path_to_tree(&self, root: &mut TreeNode, base_path: &Path, full_path: &Path, is_file: bool) {
+    fn add_path_to_tree(
+        &self,
+        root: &mut TreeNode,
+        base_path: &Path,
+        full_path: &Path,
+        is_file: bool,
+    ) {
         // Get relative path from base
         let relative_path = match full_path.strip_prefix(base_path) {
             Ok(rel) => rel,
@@ -201,7 +224,8 @@ impl TreeGenerator {
             let node_is_file = is_last && is_file;
 
             if !current.children.contains_key(&name) {
-                let node_path = base_path.join(relative_path.iter().take(i + 1).collect::<PathBuf>());
+                let node_path =
+                    base_path.join(relative_path.iter().take(i + 1).collect::<PathBuf>());
                 let node = TreeNode::new(name.clone(), node_path, node_is_file);
                 current.children.insert(name.clone(), node);
             }
@@ -268,7 +292,8 @@ impl TreeGenerator {
             TocMode::FilesAndDirs => true,
             TocMode::Auto => {
                 // Estimate total lines with files
-                let total_lines: usize = trees.iter()
+                let total_lines: usize = trees
+                    .iter()
                     .map(|tree| tree.estimate_render_lines(true))
                     .sum();
                 total_lines < 100
@@ -277,7 +302,7 @@ impl TreeGenerator {
 
         for (i, tree) in trees.iter().enumerate() {
             let is_last = i == trees.len() - 1;
-            self.render_node(tree, "", is_last, show_files, &mut output);
+            Self::render_node(tree, "", is_last, show_files, &mut output);
         }
 
         output.join("\n")
@@ -285,7 +310,6 @@ impl TreeGenerator {
 
     /// Render a single tree node with proper indentation and tree characters
     fn render_node(
-        &self,
         node: &TreeNode,
         prefix: &str,
         is_last: bool,
@@ -299,7 +323,7 @@ impl TreeGenerator {
 
         // Choose the appropriate tree character
         let connector = if is_last { "└── " } else { "├── " };
-        
+
         // Add file/directory indicator
         let name = if node.is_file {
             node.name.clone()
@@ -318,8 +342,8 @@ impl TreeGenerator {
             } else {
                 format!("{}│   ", prefix)
             };
-            
-            self.render_node(child, &child_prefix, child_is_last, show_files, output);
+
+            Self::render_node(child, &child_prefix, child_is_last, show_files, output);
         }
     }
 }
@@ -332,12 +356,8 @@ mod tests {
 
     #[test]
     fn test_tree_node_creation() {
-        let node = TreeNode::new(
-            "test".to_string(),
-            PathBuf::from("/test"),
-            false
-        );
-        
+        let node = TreeNode::new("test".to_string(), PathBuf::from("/test"), false);
+
         assert_eq!(node.name, "test");
         assert_eq!(node.path, PathBuf::from("/test"));
         assert!(!node.is_file);
@@ -349,10 +369,10 @@ mod tests {
         let mut root = TreeNode::new("root".to_string(), PathBuf::from("/root"), false);
         let child1 = TreeNode::new("child1".to_string(), PathBuf::from("/root/child1"), true);
         let child2 = TreeNode::new("child2".to_string(), PathBuf::from("/root/child2"), false);
-        
+
         root.add_child(child1);
         root.add_child(child2);
-        
+
         assert_eq!(root.count_nodes(), 3);
         assert_eq!(root.count_files(), 1);
     }
@@ -361,12 +381,12 @@ mod tests {
     fn test_basic_tree_generation() {
         let temp_dir = TempDir::new().unwrap();
         let base_path = temp_dir.path();
-        
+
         // Create test structure
         fs::create_dir_all(base_path.join("subdir")).unwrap();
         fs::write(base_path.join("file1.txt"), "content1").unwrap();
         fs::write(base_path.join("subdir/file2.txt"), "content2").unwrap();
-        
+
         let generator = TreeGenerator::new(
             vec![],
             false,
@@ -374,36 +394,57 @@ mod tests {
             true, // ignore gitignore
             vec![],
         );
-        
+
         let trees = generator.generate_tree(&[base_path.to_path_buf()]).unwrap();
-        
+
         // Debug output
         println!("Generated trees: {}", trees.len());
         for (i, tree) in trees.iter().enumerate() {
-            println!("Tree {}: {} (children: {})", i, tree.name, tree.children.len());
+            println!(
+                "Tree {}: {} (children: {})",
+                i,
+                tree.name,
+                tree.children.len()
+            );
         }
-        
-        assert!(trees.len() >= 1, "Expected at least 1 tree, got {}", trees.len());
-        
+
+        assert!(
+            trees.len() >= 1,
+            "Expected at least 1 tree, got {}",
+            trees.len()
+        );
+
         let tree = &trees[0];
         assert!(!tree.is_file);
-        assert!(tree.children.len() >= 1, "Expected at least 1 child, got {}", tree.children.len());
+        assert!(
+            tree.children.len() >= 1,
+            "Expected at least 1 child, got {}",
+            tree.children.len()
+        );
     }
 
     #[test]
     fn test_tree_rendering() {
         let mut root = TreeNode::new("root".to_string(), PathBuf::from("/root"), false);
         let mut subdir = TreeNode::new("subdir".to_string(), PathBuf::from("/root/subdir"), false);
-        let file1 = TreeNode::new("file1.txt".to_string(), PathBuf::from("/root/file1.txt"), true);
-        let file2 = TreeNode::new("file2.txt".to_string(), PathBuf::from("/root/subdir/file2.txt"), true);
-        
+        let file1 = TreeNode::new(
+            "file1.txt".to_string(),
+            PathBuf::from("/root/file1.txt"),
+            true,
+        );
+        let file2 = TreeNode::new(
+            "file2.txt".to_string(),
+            PathBuf::from("/root/subdir/file2.txt"),
+            true,
+        );
+
         subdir.add_child(file2);
         root.add_child(file1);
         root.add_child(subdir);
-        
+
         let generator = TreeGenerator::new(vec![], false, false, true, vec![]);
         let output = generator.render_tree(&[root], TocMode::FilesAndDirs);
-        
+
         assert!(output.contains("root/"));
         assert!(output.contains("├── file1.txt"));
         assert!(output.contains("└── subdir/"));
@@ -413,13 +454,17 @@ mod tests {
     #[test]
     fn test_auto_mode_line_estimation() {
         let mut root = TreeNode::new("root".to_string(), PathBuf::from("/root"), false);
-        
+
         // Create many children to exceed 100 lines
         for i in 0..50 {
-            let file = TreeNode::new(format!("file{}.txt", i), PathBuf::from(format!("/root/file{}.txt", i)), true);
+            let file = TreeNode::new(
+                format!("file{}.txt", i),
+                PathBuf::from(format!("/root/file{}.txt", i)),
+                true,
+            );
             root.add_child(file);
         }
-        
+
         assert!(root.estimate_render_lines(true) > 50);
         assert_eq!(root.estimate_render_lines(false), 1); // Only the root directory
     }

@@ -4,3 +4,5 @@ debug
 target
 docs
 rust-implementation-plan.md
+.vscode
+.claude

@@ -1,8 +1,8 @@
 //! XML output formatter for Claude's preferred format
 
-use std::path::Path;
 use crate::output::OutputFormatter;
 use crate::utils::add_line_numbers;
+use std::path::Path;
 
 /// XML formatter that outputs files in Claude's preferred XML format:
 /// <documents>
@@ -15,6 +15,12 @@ use crate::utils::add_line_numbers;
 /// </documents>
 pub struct XmlFormatter {
     index: usize,
+}
+
+impl Default for XmlFormatter {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl XmlFormatter {
@@ -30,7 +36,7 @@ impl OutputFormatter for XmlFormatter {
         } else {
             content.to_string()
         };
-        
+
         let output = format!(
             r#"<document index="{}">
 <source>{}</source>
@@ -38,13 +44,15 @@ impl OutputFormatter for XmlFormatter {
 {}
 </document_content>
 </document>"#,
-            self.index, path.display(), content
+            self.index,
+            path.display(),
+            content
         );
-        
+
         self.index += 1;
         output
     }
-    
+
     fn format_table_of_contents(&mut self, toc: &str) -> String {
         format!(
             r#"<table_of_contents>
@@ -53,11 +61,11 @@ impl OutputFormatter for XmlFormatter {
             toc
         )
     }
-    
+
     fn start_output(&mut self) -> String {
         "<documents>".to_string()
     }
-    
+
     fn end_output(&mut self) -> String {
         "</documents>".to_string()
     }
@@ -73,7 +81,7 @@ mod tests {
         let mut formatter = XmlFormatter::new();
         let path = PathBuf::from("test.txt");
         let content = "Hello, world!";
-        
+
         let result = formatter.format_file(&path, content, false);
         let expected = r#"<document index="1">
 <source>test.txt</source>
@@ -89,10 +97,10 @@ Hello, world!
         let mut formatter = XmlFormatter::new();
         let path1 = PathBuf::from("test1.txt");
         let path2 = PathBuf::from("test2.txt");
-        
+
         let result1 = formatter.format_file(&path1, "content1", false);
         let result2 = formatter.format_file(&path2, "content2", false);
-        
+
         assert!(result1.contains(r#"index="1""#));
         assert!(result2.contains(r#"index="2""#));
     }
@@ -102,7 +110,7 @@ Hello, world!
         let mut formatter = XmlFormatter::new();
         let path = PathBuf::from("test.txt");
         let content = "line 1\nline 2";
-        
+
         let result = formatter.format_file(&path, content, true);
         assert!(result.contains("1  line 1\n2  line 2"));
     }

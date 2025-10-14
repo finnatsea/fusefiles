@@ -1,16 +1,22 @@
 //! Default output formatter - simple format with path, separator, and content
 
-use std::path::Path;
 use crate::output::OutputFormatter;
 use crate::utils::add_line_numbers;
+use std::path::Path;
 
 /// Default formatter that outputs files in simple format:
 /// path
 /// ---
 /// content
-/// 
+///
 /// ---
 pub struct DefaultFormatter;
+
+impl Default for DefaultFormatter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
 impl DefaultFormatter {
     pub fn new() -> Self {
@@ -25,18 +31,18 @@ impl OutputFormatter for DefaultFormatter {
         } else {
             content.to_string()
         };
-        
+
         format!("{}\n---\n{}\n\n---", path.display(), content)
     }
-    
+
     fn format_table_of_contents(&mut self, toc: &str) -> String {
         format!("Table of Contents\n---\n{}\n\n---", toc)
     }
-    
+
     fn start_output(&mut self) -> String {
         String::new()
     }
-    
+
     fn end_output(&mut self) -> String {
         String::new()
     }
@@ -52,7 +58,7 @@ mod tests {
         let mut formatter = DefaultFormatter::new();
         let path = PathBuf::from("test.txt");
         let content = "Hello, world!";
-        
+
         let result = formatter.format_file(&path, content, false);
         assert_eq!(result, "test.txt\n---\nHello, world!\n\n---");
     }
@@ -62,7 +68,7 @@ mod tests {
         let mut formatter = DefaultFormatter::new();
         let path = PathBuf::from("test.txt");
         let content = "line 1\nline 2";
-        
+
         let result = formatter.format_file(&path, content, true);
         assert_eq!(result, "test.txt\n---\n1  line 1\n2  line 2\n\n---");
     }

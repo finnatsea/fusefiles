@@ -65,3 +65,9 @@ Integration tests in `tests/integration_tests.rs` cover all major features inclu
 - Multiple output formats
 - Extension filtering
 - Stdin input processing
+
+When you change files, in general you should run: 
+`cargo build` - to check that it builds
+`cargo fmt` - to keep file formatting clean
+`cargo clippy` - to lint
+`cargo test` - to ensure everything works
