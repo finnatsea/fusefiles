@@ -127,8 +127,20 @@ impl TreeGenerator {
             .into_iter()
             .filter_entry(|e| {
                 // Filter out hidden directories if not including hidden files
-                if !self.include_hidden && self.is_hidden_path(e.path()) {
-                    return false;
+                // Check only the relative path from dir_path, not the full path
+                if !self.include_hidden {
+                    if let Ok(rel_path) = e.path().strip_prefix(dir_path) {
+                        // Check if any component in the relative path is hidden
+                        if rel_path.components().any(|c| {
+                            if let Some(name) = c.as_os_str().to_str() {
+                                name.starts_with('.') && name != "." && name != ".."
+                            } else {
+                                false
+                            }
+                        }) {
+                            return false;
+                        }
+                    }
                 }
                 true
             });
@@ -240,17 +252,6 @@ impl TreeGenerator {
             .and_then(|name| name.to_str())
             .map(|name| name.starts_with('.'))
             .unwrap_or(false)
-    }
-
-    /// Check if any component of a path is hidden
-    fn is_hidden_path(&self, path: &Path) -> bool {
-        path.components().any(|component| {
-            if let Some(name) = component.as_os_str().to_str() {
-                name.starts_with('.') && name != "." && name != ".."
-            } else {
-                false
-            }
-        })
     }
 
     /// Render tree to string format
