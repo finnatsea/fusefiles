@@ -9,24 +9,24 @@ use crate::output::{DefaultFormatter, MarkdownFormatter, XmlFormatter};
 use crate::utils::read_paths_from_stdin;
 use crate::{FileProcessor, Result};
 
-/// files-to-prompt: Turn many files -> single file, useful for LLM prompting
+/// fusefiles: Turn many files -> single file, useful for LLM prompting
 #[derive(Parser)]
-#[command(name = "files-to-prompt")]
+#[command(name = "fuse")]
 #[command(about = "Turn many files -> single file, useful for LLM prompting.")]
 #[command(
     long_about = r#"Turn many files -> single file, useful for LLM prompting.
 
 Usage:
-  files-to-prompt [path/to/file_or_directory] [options]
+  fuse [path/to/file_or_directory] [options]
 
 Here's a few samples to get started:
-  files-to-prompt src/                                      # All files in src/
-  files-to-prompt src/ test/ -e ts                          # All ts files in src/ and test
-  files-to-prompt hello.text test/ -e rs -e toml            # hello file and .rs and .toml files in test
-  files-to-prompt . --ignore "*.log" --ignore "test_*"      # Skip logs and files that start with "test_"
-  files-to-prompt . -o output.txt                           # Save to file instead of printing or use >
+  fuse src/                                      # All files in src/
+  fuse src/ test/ -e ts                          # All ts files in src/ and test
+  fuse hello.text test/ -e rs -e toml            # hello file and .rs and .toml files in test
+  fuse . --ignore "*.log" --ignore "test_*"      # Skip logs and files that start with "test_"
+  fuse . -o output.txt                           # Save to file instead of printing or use >
 
-For a full list of options, run `files-to-prompt help`."#
+For a full list of options, run `fuse help`."#
 )]
 #[command(version)]
 #[command(disable_help_flag = true)]
@@ -108,30 +108,30 @@ pub struct Cli {
 const SHORT_HELP_TEXT: &str = r#"Turn many files -> single file, useful for LLM prompting.
 
 Usage:
-  files-to-prompt [path/to/file_or_directory] [options]
+  fuse [path/to/file_or_directory] [options]
 
 Here's a few samples to get started:
-  files-to-prompt src/                                      # All files in src/
-  files-to-prompt src/ test/ -e ts                          # All ts files in src/ and test
-  files-to-prompt hello.text test/ -e rs -e toml            # hello file and .rs and .toml files in test
-  files-to-prompt . --ignore "*.log" --ignore "test_*"      # Skip logs and files that start with "test_"
-  files-to-prompt . -o output.txt                           # Save to file instead of printing or use >
+  fuse src/                                      # All files in src/
+  fuse src/ test/ -e ts                          # All ts files in src/ and test
+  fuse hello.text test/ -e rs -e toml            # hello file and .rs and .toml files in test
+  fuse . --ignore "*.log" --ignore "test_*"      # Skip logs and files that start with "test_"
+  fuse . -o output.txt                           # Save to file instead of printing or use >
 
-For a full list of options, run `files-to-prompt --help`."#;
+For a full list of options, run `fuse --help`."#;
 
 const FULL_HELP_TEXT: &str = r#"Turn many files -> single file, useful for LLM prompting.
 
 Usage:
-  files-to-prompt [path/to/file_or_directory] [options]
+  fuse [path/to/file_or_directory] [options]
 
 Here's a few samples to get started:
-  files-to-prompt src/                                      # All files in src/
-  files-to-prompt src/ test/ -e ts                          # All ts files in src/ and test
-  files-to-prompt hello.text test/ -e rs -e toml            # hello file and .rs and .toml files in test
-  files-to-prompt . --ignore "*.log" --ignore "test_*"      # Skip logs and files that start with "test_"
-  files-to-prompt . -o output.txt                           # Save to file instead of printing or use >
+  fuse src/                                      # All files in src/
+  fuse src/ test/ -e ts                          # All ts files in src/ and test
+  fuse hello.text test/ -e rs -e toml            # hello file and .rs and .toml files in test
+  fuse . --ignore "*.log" --ignore "test_*"      # Skip logs and files that start with "test_"
+  fuse . -o output.txt                           # Save to file instead of printing or use >
 
-For a full list of options, run `files-to-prompt --help`.
+For a full list of options, run `fuse --help`.
 
 OPTIONS
 Input Control:

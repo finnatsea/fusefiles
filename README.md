@@ -1,6 +1,8 @@
-# files-to-prompt-rs
+# fusefiles
 
 A Rust CLI tool that concatenates files into a single prompt for use with LLMs. Inspired by Simon Willison's [files-to-prompt](https://github.com/simonw/files-to-prompt) but faster and with more features, like including a file tree at the top of the single file.
+
+**CLI command:** `fuse` (clean and simple!)
 
 ## How to Use
 
@@ -9,20 +11,22 @@ A Rust CLI tool that concatenates files into a single prompt for use with LLMs. 
 #### Install from crates.io
 
 ```bash
-cargo install files-to-prompt
+cargo install fusefiles
 ```
+
+This installs the `fuse` command.
 
 #### Build and Install from Source
 
 Clone the repository and install:
 
 ```bash
-git clone https://github.com/finnatsea/files-to-prompt-rs.git
-cd files-to-prompt-rs
+git clone https://github.com/finnatsea/fusefiles.git
+cd fusefiles
 cargo install --path .
 ```
 
-This installs the binary to `~/.cargo/bin/files-to-prompt`, making it available system-wide.
+This installs the binary to `~/.cargo/bin/fuse`, making it available system-wide.
 
 #### Build Only (for development)
 
@@ -30,59 +34,59 @@ This installs the binary to `~/.cargo/bin/files-to-prompt`, making it available 
 cargo build --release
 ```
 
-The executable will be in `target/release/files-to-prompt`.
+The executable will be in `target/release/fuse`.
 
 
 ### How do I use it?
 
 ```bash
 # Process a directory
-files-to-prompt src/
+fuse src/
 
 # Process multiple paths
-files-to-prompt src/ tests/ Cargo.toml
+fuse src/ tests/ Cargo.toml
 
 # Only include Python and Rust files
-files-to-prompt src/ -e py -e rs
+fuse src/ -e py -e rs
 
 # Output in markdown format with code blocks
-files-to-prompt src/ --markdown
+fuse src/ --markdown
 
 # Output in Claude XML format
-files-to-prompt src/ --cxml
+fuse src/ --cxml
 
 # Save output to a file
-files-to-prompt src/ -o output.txt
+fuse src/ -o output.txt
 
 # Exclude test files
-files-to-prompt src/ --ignore "*test*"
+fuse src/ --ignore "*test*"
 
 # Include hidden files
-files-to-prompt . --include-hidden
+fuse . --include-hidden
 
 # Add line numbers
-files-to-prompt src/main.rs -n
+fuse src/main.rs -n
 
 # Add a table of contents tree
-files-to-prompt src/ --toc
+fuse src/ --toc
 
 # Table of contents with directories only
-files-to-prompt src/ --toc-dirs-only
+fuse src/ --toc-dirs-only
 
 # Table of contents with files and directories
-files-to-prompt src/ --toc-files
+fuse src/ --toc-files
 
 # Ignore files only (not directories) with pattern
-files-to-prompt src/ --ignore "*test*" --ignore-files-only
+fuse src/ --ignore "*test*" --ignore-files-only
 
 # Ignore .gitignore rules
-files-to-prompt . --ignore-gitignore
+fuse . --ignore-gitignore
 
 # Pipe file paths from another command
-find . -name "*.rs" | files-to-prompt
+find . -name "*.rs" | fuse
 
 # Use with null-separated paths
-find . -name "*.rs" -print0 | files-to-prompt --null
+find . -name "*.rs" -print0 | fuse --null
 ```
 
 ## Development

@@ -1,4 +1,4 @@
-//! files-to-prompt: Concatenate a directory full of files into a single prompt for use with LLMs
+//! fusefiles: Concatenate a directory full of files into a single prompt for use with LLMs
 //!
 //! This crate provides functionality to recursively process files and directories,
 //! concatenating their contents with various output formats suitable for LLM prompts.
@@ -6,7 +6,7 @@
 use std::path::PathBuf;
 use thiserror::Error;
 
-/// Main error type for the files-to-prompt application
+/// Main error type for the fusefiles application
 #[derive(Debug, Error)]
 pub enum FilesToPromptError {
     #[error("File not found: {path}")]
@@ -28,7 +28,7 @@ pub enum FilesToPromptError {
     PatternError(String),
 }
 
-/// Result type alias for the files-to-prompt application
+/// Result type alias for the fusefiles application
 pub type Result<T> = std::result::Result<T, FilesToPromptError>;
 
 /// Table of contents mode for tree generation

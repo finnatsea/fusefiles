@@ -1,17 +1,17 @@
 [package]
-name = "files-to-prompt"
+name = "fusefiles"
 version = "0.6.0"
 edition = "2021"
 description = "Concatenate a directory full of files into a single prompt for use with LLMs"
 license = "Apache-2.0"
-authors = ["files-to-prompt-rs contributors"]
-repository = "https://github.com/finnatsea/files-to-prompt-rs"
+authors = ["Finnian Brown"]
+repository = "https://github.com/finnatsea/fusefiles"
 readme = "README.md"
 keywords = ["cli", "files", "prompt", "llm", "concatenate"]
 categories = ["command-line-utilities", "text-processing"]
 
 [[bin]]
-name = "files-to-prompt"
+name = "fuse"
 path = "src/main.rs"
 
 [dependencies]

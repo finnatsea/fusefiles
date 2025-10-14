@@ -1,4 +1,4 @@
-//! Integration tests for files-to-prompt
+//! Integration tests for fusefiles
 //!
 //! These tests match the functionality of the Python pytest suite
 
@@ -8,7 +8,7 @@ use tempfile::TempDir;
 
 /// Helper function to create a command for our binary
 fn cmd() -> Command {
-    Command::cargo_bin("files-to-prompt").unwrap()
+    Command::cargo_bin("fuse").unwrap()
 }
 
 /// Extract filenames from XML output using simple string matching
@@ -348,9 +348,8 @@ fn test_binary_file_warning() {
     assert!(stdout.contains(&expected_text));
     assert!(stdout.contains("This is a text file"));
     assert!(!stdout.contains("binary_file.bin"));
-    assert!(stderr.contains("Warning: Skipping file"));
+    assert!(stderr.contains("Warning: Skipping binary file"));
     assert!(stderr.contains("binary_file.bin"));
-    assert!(stderr.contains("UnicodeDecodeError"));
 }
 
 #[test]

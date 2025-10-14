@@ -1,4 +1,4 @@
-use files_to_prompt::cli;
+use fusefiles::cli;
 use std::process;
 
 fn main() {

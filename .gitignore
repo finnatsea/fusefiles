@@ -1,4 +1,5 @@
-files-to-prompt
+fuse
+fusefiles
 **/*.rs.bk
 debug
 target
@@ -6,3 +7,4 @@ docs
 rust-implementation-plan.md
 .vscode
 .claude
+*.log

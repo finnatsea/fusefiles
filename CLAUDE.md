@@ -13,7 +13,7 @@ cargo build --release  # Optimized release build
 ### Run
 ```bash
 cargo run -- [args]                    # Run with cargo
-./target/debug/files-to-prompt [args]  # Run debug binary directly
+./target/debug/fuse [args]  # Run debug binary directly
 ```
 
 ### Test
@@ -32,7 +32,7 @@ cargo clippy     # Lint with clippy
 
 ## Architecture Overview
 
-This is a Rust implementation of the `files-to-prompt` CLI tool that concatenates files into a single prompt for use with LLMs. The codebase is organized around a modular architecture with clear separation of concerns.
+This is a Rust implementation of the `fuse` CLI tool (published as `fusefiles` on crates.io) that concatenates files into a single prompt for use with LLMs. The codebase is organized around a modular architecture with clear separation of concerns.
 
 ### Core Components
 
@@ -67,6 +67,7 @@ Integration tests in `tests/integration_tests.rs` cover all major features inclu
 - Stdin input processing
 
 When you change files, in general you should run: 
+`cargo check` - to check that the code compiles
 `cargo build` - to check that it builds
 `cargo fmt` - to keep file formatting clean
 `cargo clippy` - to lint

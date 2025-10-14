@@ -127,10 +127,7 @@ impl FileProcessor {
                 output.push(formatted);
             }
             Err(FilesToPromptError::BinaryFile { path }) => {
-                eprintln!(
-                    "Warning: Skipping file {} due to UnicodeDecodeError",
-                    path.display()
-                );
+                eprintln!("Warning: Skipping binary file {}", path.display());
             }
             Err(e) => return Err(e),
         }
@@ -188,10 +185,7 @@ impl FileProcessor {
                     output.push(formatted);
                 }
                 Err(FilesToPromptError::BinaryFile { path }) => {
-                    eprintln!(
-                        "Warning: Skipping file {} due to UnicodeDecodeError",
-                        path.display()
-                    );
+                    eprintln!("Warning: Skipping binary file {}", path.display());
                 }
                 Err(e) => return Err(e),
             }
@@ -257,18 +251,19 @@ impl FileProcessor {
 
     /// Read file content and handle binary files
     fn read_file_content(&self, path: &Path) -> Result<String> {
-        match fs::read_to_string(path) {
+        let bytes = fs::read(path)?;
+
+        if Self::is_binary(&bytes) {
+            return Err(FilesToPromptError::BinaryFile {
+                path: path.to_path_buf(),
+            });
+        }
+
+        match String::from_utf8(bytes) {
             Ok(content) => Ok(content),
-            Err(e) => {
-                // Check if it's a UTF-8 decode error (likely binary file)
-                if e.kind() == std::io::ErrorKind::InvalidData {
-                    Err(FilesToPromptError::BinaryFile {
-                        path: path.to_path_buf(),
-                    })
-                } else {
-                    Err(FilesToPromptError::Io(e))
-                }
-            }
+            Err(_) => Err(FilesToPromptError::BinaryFile {
+                path: path.to_path_buf(),
+            }),
         }
     }
 
@@ -296,6 +291,28 @@ impl FileProcessor {
             .and_then(|name| name.to_str())
             .map(|name| name.starts_with('.'))
             .unwrap_or(false)
+    }
+
+    fn is_binary(bytes: &[u8]) -> bool {
+        const SAMPLE_SIZE: usize = 1024;
+        let sample_len = bytes.len().min(SAMPLE_SIZE);
+
+        if sample_len == 0 {
+            return false;
+        }
+
+        let mut suspicious = 0;
+        for &byte in &bytes[..sample_len] {
+            if byte == 0 {
+                return true;
+            }
+
+            if matches!(byte, 0x01..=0x08 | 0x0B | 0x0E..=0x1F) {
+                suspicious += 1;
+            }
+        }
+
+        suspicious * 100 / sample_len > 10
     }
 }
 
