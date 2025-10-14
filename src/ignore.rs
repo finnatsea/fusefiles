@@ -1,105 +1,130 @@
-//! Gitignore file parsing and pattern matching logic
+//! Custom ignore pattern handling built around glob matching.
+//!
+//! This module focuses on user-specified `--ignore` patterns. Gitignore semantics
+//! are handled through the `ignore` crate in the traversal code, which means this
+//! helper only needs to reason about additional patterns supplied via CLI flags.
 
 use crate::{FilesToPromptError, Result};
 use glob::Pattern;
-use std::fs;
 use std::path::Path;
 
-/// Handles ignore patterns from gitignore files and custom patterns
-pub struct IgnoreChecker {
-    gitignore_patterns: Vec<Pattern>,
-    custom_patterns: Vec<Pattern>,
+/// Normalise a path to a forward-slash separated string for glob matching.
+fn normalise_path(path: &Path) -> String {
+    path.components()
+        .map(|component| component.as_os_str().to_string_lossy())
+        .collect::<Vec<_>>()
+        .join("/")
+}
+
+#[derive(Clone)]
+struct CustomPattern {
+    original: String,
+    glob: Pattern,
+    directory_only: bool,
+}
+
+/// Represents user-supplied ignore patterns.
+#[derive(Clone)]
+pub struct CustomIgnore {
+    patterns: Vec<CustomPattern>,
     ignore_files_only: bool,
 }
 
-impl IgnoreChecker {
-    /// Create a new IgnoreChecker
-    pub fn new(ignore_files_only: bool) -> Self {
-        Self {
-            gitignore_patterns: Vec::new(),
-            custom_patterns: Vec::new(),
+impl CustomIgnore {
+    /// Build the matcher from raw pattern strings.
+    pub fn new(patterns: Vec<String>, ignore_files_only: bool) -> Result<Self> {
+        let mut compiled = Vec::new();
+        for pattern in patterns {
+            let trimmed = pattern.trim();
+            if trimmed.is_empty() {
+                continue;
+            }
+            let glob = Pattern::new(trimmed)
+                .map_err(|e| FilesToPromptError::PatternError(e.msg.into()))?;
+            compiled.push(CustomPattern {
+                original: trimmed.to_string(),
+                glob,
+                directory_only: trimmed.ends_with('/'),
+            });
+        }
+
+        Ok(Self {
+            patterns: compiled,
             ignore_files_only,
-        }
+        })
     }
 
-    /// Add patterns from a .gitignore file
-    pub fn add_gitignore_file(&mut self, gitignore_path: &Path) -> Result<()> {
-        if gitignore_path.exists() && gitignore_path.is_file() {
-            let content = fs::read_to_string(gitignore_path)?;
-            for line in content.lines() {
-                let line = line.trim();
-                // Skip empty lines and comments
-                if !line.is_empty() && !line.starts_with('#') {
-                    match Pattern::new(line) {
-                        Ok(pattern) => self.gitignore_patterns.push(pattern),
-                        Err(e) => return Err(FilesToPromptError::PatternError(e.to_string())),
-                    }
-                }
-            }
-        }
-        Ok(())
+    /// Returns true when no patterns were provided.
+    pub fn is_empty(&self) -> bool {
+        self.patterns.is_empty()
     }
 
-    /// Add custom ignore patterns
-    pub fn add_custom_patterns(&mut self, patterns: &[String]) -> Result<()> {
-        for pattern_str in patterns {
-            if !pattern_str.is_empty() {
-                match Pattern::new(pattern_str) {
-                    Ok(pattern) => self.custom_patterns.push(pattern),
-                    Err(e) => return Err(FilesToPromptError::PatternError(e.to_string())),
-                }
-            }
-        }
-        Ok(())
+    /// Exposes the `ignore-files-only` flag.
+    pub fn ignore_files_only(&self) -> bool {
+        self.ignore_files_only
     }
 
-    /// Check if a path should be ignored based on gitignore rules
-    pub fn should_ignore_gitignore(&self, path: &Path) -> bool {
-        Self::matches_any_pattern(path, &self.gitignore_patterns)
+    /// Should the given file be ignored?
+    pub fn should_ignore_file(&self, path: &Path) -> bool {
+        self.should_ignore(path, true)
     }
 
-    /// Check if a path should be ignored based on custom patterns
-    pub fn should_ignore_custom(&self, path: &Path, is_file: bool) -> bool {
-        // If ignore_files_only is true and this is a directory, don't ignore
-        if self.ignore_files_only && !is_file {
+    /// Should the given directory be ignored?
+    pub fn should_ignore_dir(&self, path: &Path) -> bool {
+        self.should_ignore(path, false)
+    }
+
+    fn should_ignore(&self, path: &Path, is_file: bool) -> bool {
+        if self.patterns.is_empty() {
             return false;
         }
-        Self::matches_any_pattern(path, &self.custom_patterns)
+
+        if !is_file && self.ignore_files_only {
+            return false;
+        }
+
+        self.patterns
+            .iter()
+            .any(|pattern| Self::matches_pattern(pattern, path, is_file))
     }
 
-    /// Check if a path matches any of the given patterns
-    fn matches_any_pattern(path: &Path, patterns: &[Pattern]) -> bool {
-        if let Some(filename) = path.file_name().and_then(|n| n.to_str()) {
-            // Check against filename
-            if patterns.iter().any(|pattern| pattern.matches(filename)) {
+    fn matches_pattern(pattern: &CustomPattern, path: &Path, is_file: bool) -> bool {
+        let glob = &pattern.glob;
+        if let Some(name) = path.file_name().and_then(|n| n.to_str()) {
+            if glob.matches(name) {
                 return true;
             }
-
-            // For directories, also check with trailing slash
-            if path.is_dir() {
-                let dir_pattern = format!("{}/", filename);
-                if patterns.iter().any(|pattern| pattern.matches(&dir_pattern)) {
+            if !is_file {
+                let with_slash = format!("{}/", name);
+                if glob.matches(&with_slash) {
                     return true;
                 }
             }
         }
-        false
-    }
-}
 
-/// Read gitignore patterns from a directory
-pub fn read_gitignore_patterns(dir_path: &Path) -> Result<Vec<String>> {
-    let gitignore_path = dir_path.join(".gitignore");
-    if gitignore_path.exists() && gitignore_path.is_file() {
-        let content = fs::read_to_string(gitignore_path)?;
-        Ok(content
-            .lines()
-            .map(|line| line.trim())
-            .filter(|line| !line.is_empty() && !line.starts_with('#'))
-            .map(|line| line.to_string())
-            .collect())
-    } else {
-        Ok(Vec::new())
+        let normalised = normalise_path(path);
+        if glob.matches(&normalised) {
+            return true;
+        }
+
+        if !is_file {
+            let mut with_trailing = normalised.clone();
+            if !with_trailing.ends_with('/') {
+                with_trailing.push('/');
+            }
+            if glob.matches(&with_trailing) {
+                return true;
+            }
+
+            if pattern.directory_only {
+                let target = pattern.original.trim_end_matches('/');
+                if normalised == target || normalised.starts_with(&format!("{}/", target)) {
+                    return true;
+                }
+            }
+        }
+
+        false
     }
 }
 
@@ -108,55 +133,46 @@ mod tests {
     use super::*;
     use std::path::PathBuf;
 
-    #[test]
-    fn test_empty_checker() {
-        let checker = IgnoreChecker::new(false);
-        let path = PathBuf::from("test.txt");
-        assert!(!checker.should_ignore_gitignore(&path));
-        assert!(!checker.should_ignore_custom(&path, true));
+    fn path(s: &str) -> PathBuf {
+        PathBuf::from(s)
     }
 
     #[test]
-    fn test_custom_patterns() {
-        let mut checker = IgnoreChecker::new(false);
-        checker
-            .add_custom_patterns(&["*.log".to_string(), "temp*".to_string()])
-            .unwrap();
-
-        assert!(checker.should_ignore_custom(&PathBuf::from("test.log"), true));
-        assert!(checker.should_ignore_custom(&PathBuf::from("temp_file"), true));
-        assert!(!checker.should_ignore_custom(&PathBuf::from("test.txt"), true));
+    fn empty_patterns_never_ignore() {
+        let matcher = CustomIgnore::new(vec![], false).unwrap();
+        assert!(!matcher.should_ignore_file(&path("foo")));
+        assert!(!matcher.should_ignore_dir(&path("foo")));
     }
 
     #[test]
-    fn test_ignore_files_only() {
-        let mut checker = IgnoreChecker::new(true);
-        checker.add_custom_patterns(&["test*".to_string()]).unwrap();
-
-        // Should ignore files matching pattern
-        assert!(checker.should_ignore_custom(&PathBuf::from("test.txt"), true));
-        // Should NOT ignore directories when ignore_files_only is true
-        assert!(!checker.should_ignore_custom(&PathBuf::from("test_dir"), false));
+    fn ignores_files_using_globs() {
+        let matcher = CustomIgnore::new(vec!["*.log".into(), "temp*".into()], false).unwrap();
+        assert!(matcher.should_ignore_file(&path("debug.log")));
+        assert!(matcher.should_ignore_file(&path("temp_data.txt")));
+        assert!(!matcher.should_ignore_file(&path("keep.txt")));
     }
 
     #[test]
-    fn test_pattern_matching() {
-        let patterns = vec![
-            Pattern::new("*.txt").unwrap(),
-            Pattern::new("temp*").unwrap(),
-        ];
+    fn ignores_directories_when_allowed() {
+        let matcher = CustomIgnore::new(vec!["build/".into()], false).unwrap();
+        assert!(matcher.should_ignore_dir(&path("build")));
+        assert!(matcher.should_ignore_dir(&path("build/subdir")));
+    }
 
-        assert!(IgnoreChecker::matches_any_pattern(
-            &PathBuf::from("test.txt"),
-            &patterns
-        ));
-        assert!(IgnoreChecker::matches_any_pattern(
-            &PathBuf::from("temp_file"),
-            &patterns
-        ));
-        assert!(!IgnoreChecker::matches_any_pattern(
-            &PathBuf::from("test.py"),
-            &patterns
-        ));
+    #[test]
+    fn ignore_files_only_skips_directories() {
+        let matcher = CustomIgnore::new(vec!["build/".into()], true).unwrap();
+        assert!(!matcher.should_ignore_dir(&path("build")));
+        assert!(matcher.ignore_files_only());
+    }
+
+    #[test]
+    fn matches_against_normalised_paths() {
+        let matcher =
+            CustomIgnore::new(vec!["src/**/*.rs".into(), "nested/file.txt".into()], false).unwrap();
+        assert!(matcher.should_ignore_file(&path("src/lib.rs")));
+        assert!(matcher.should_ignore_file(&path("src/foo/mod.rs")));
+        assert!(matcher.should_ignore_file(&path("nested/file.txt")));
+        assert!(!matcher.should_ignore_file(&path("nested/file.md")));
     }
 }

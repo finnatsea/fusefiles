@@ -105,9 +105,7 @@ pub struct Cli {
     pub version: Option<bool>,
 }
 
-fn print_short_help() {
-    println!(
-        r#"Turn many files -> single file, useful for LLM prompting.
+const SHORT_HELP_TEXT: &str = r#"Turn many files -> single file, useful for LLM prompting.
 
 Usage:
   files-to-prompt [path/to/file_or_directory] [options]
@@ -119,13 +117,9 @@ Here's a few samples to get started:
   files-to-prompt . --ignore "*.log" --ignore "test_*"      # Skip logs and files that start with "test_"
   files-to-prompt . -o output.txt                           # Save to file instead of printing or use >
 
-For a full list of options, run `files-to-prompt --help`."#
-    );
-}
+For a full list of options, run `files-to-prompt --help`."#;
 
-fn print_full_help() {
-    println!(
-        r#"Turn many files -> single file, useful for LLM prompting.
+const FULL_HELP_TEXT: &str = r#"Turn many files -> single file, useful for LLM prompting.
 
 Usage:
   files-to-prompt [path/to/file_or_directory] [options]
@@ -165,8 +159,14 @@ Pattern Usage:
   --ignore "test_*"        → Matches: test_utils.py, test_data.json
   --ignore "*.log"         → Matches: debug.log, error.log
   --ignore "*foo*"         → Matches: foo.txt, config_foo_bar.xml
-  --ignore "__init__.py"   → Matches: any file/folder named exactly "__init__.py""#
-    );
+  --ignore "__init__.py"   → Matches: any file/folder named exactly "__init__.py""#;
+
+fn print_short_help() {
+    println!("{}", SHORT_HELP_TEXT);
+}
+
+fn print_full_help() {
+    println!("{}", FULL_HELP_TEXT);
 }
 
 /// Main entry point for the CLI application
@@ -251,7 +251,7 @@ pub fn run() -> Result<()> {
         args.ignore_patterns,
         args.line_numbers,
         toc_mode,
-    );
+    )?;
 
     // Determine output format and process files
     let output = if args.claude_xml {

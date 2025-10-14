@@ -21,9 +21,6 @@ pub enum FilesToPromptError {
     #[error("IO error: {0}")]
     Io(#[from] std::io::Error),
 
-    #[error("Walk directory error: {0}")]
-    WalkDir(#[from] walkdir::Error),
-
     #[error("UTF-8 decode error in file: {path}")]
     Utf8Error { path: PathBuf },
 
