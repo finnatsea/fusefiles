@@ -3,9 +3,10 @@
 use std::path::{Path, PathBuf};
 use std::fs;
 use walkdir::WalkDir;
-use crate::{Result, FilesToPromptError};
+use crate::{Result, FilesToPromptError, TocMode};
 use crate::ignore::IgnoreChecker;
 use crate::output::OutputFormatter;
+use crate::tree::TreeGenerator;
 
 /// Handles file processing with filtering and directory traversal
 pub struct FileProcessor {
@@ -15,6 +16,7 @@ pub struct FileProcessor {
     ignore_gitignore: bool,
     ignore_patterns: Vec<String>,
     line_numbers: bool,
+    toc_mode: Option<TocMode>,
 }
 
 impl FileProcessor {
@@ -26,6 +28,7 @@ impl FileProcessor {
         ignore_gitignore: bool,
         ignore_patterns: Vec<String>,
         line_numbers: bool,
+        toc_mode: Option<TocMode>,
     ) -> Self {
         Self {
             extensions,
@@ -34,6 +37,7 @@ impl FileProcessor {
             ignore_gitignore,
             ignore_patterns,
             line_numbers,
+            toc_mode,
         }
     }
 
@@ -49,6 +53,26 @@ impl FileProcessor {
         let start = formatter.start_output();
         if !start.is_empty() {
             output.push(start);
+        }
+
+        // Generate and add table of contents if requested
+        if let Some(toc_mode) = self.toc_mode {
+            let tree_generator = TreeGenerator::new(
+                self.extensions.clone(),
+                self.include_hidden,
+                self.ignore_files_only,
+                self.ignore_gitignore,
+                self.ignore_patterns.clone(),
+            );
+            
+            let trees = tree_generator.generate_tree(paths)?;
+            let toc = tree_generator.render_tree(&trees, toc_mode);
+            
+            if !toc.is_empty() {
+                let formatted_toc = formatter.format_table_of_contents(&toc);
+                output.push(formatted_toc);
+                output.push(String::new()); // Add blank line after TOC
+            }
         }
 
         // Process each path
@@ -262,6 +286,7 @@ mod tests {
             false,
             vec![],
             false,
+            None,
         );
 
         assert!(processor.should_include_file_by_extension(&PathBuf::from("test.txt")));
@@ -278,6 +303,7 @@ mod tests {
             false,
             vec![],
             false,
+            None,
         );
 
         assert!(processor.should_include_file_by_extension(&PathBuf::from("test.txt")));
@@ -287,7 +313,7 @@ mod tests {
 
     #[test]
     fn test_is_hidden_file() {
-        let processor = FileProcessor::new(vec![], false, false, false, vec![], false);
+        let processor = FileProcessor::new(vec![], false, false, false, vec![], false, None);
 
         assert!(processor.is_hidden_file(&PathBuf::from(".hidden")));
         assert!(processor.is_hidden_file(&PathBuf::from(".gitignore")));
@@ -300,7 +326,7 @@ mod tests {
         let file_path = temp_dir.path().join("test.txt");
         fs::write(&file_path, "Hello, world!").unwrap();
 
-        let processor = FileProcessor::new(vec![], false, false, false, vec![], false);
+        let processor = FileProcessor::new(vec![], false, false, false, vec![], false, None);
         let mut formatter = DefaultFormatter::new();
         let mut output = Vec::new();
 

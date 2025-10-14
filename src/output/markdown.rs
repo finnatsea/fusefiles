@@ -34,8 +34,12 @@ impl OutputFormatter for MarkdownFormatter {
         // Determine backtick count needed
         let backticks = determine_backtick_count(&content);
         
-        format!("{}\n{}{}\n{}\n{}", 
+        format!("{}\n{}{}\n{}\n{}",
             path.display(), backticks, language, content, backticks)
+    }
+    
+    fn format_table_of_contents(&mut self, toc: &str) -> String {
+        format!("# Table of Contents\n\n```\n{}\n```", toc)
     }
     
     fn start_output(&mut self) -> String {

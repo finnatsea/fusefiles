@@ -76,6 +76,18 @@ pub struct Cli {
     #[arg(short = 'o', long = "output", value_name = "FILE", help_heading = "Output Format")]
     pub output_file: Option<PathBuf>,
     
+    /// Include table of contents tree (auto: files+dirs if <100 lines, dirs only if ≥100)
+    #[arg(long = "toc", help_heading = "Output Format")]
+    pub table_of_contents: bool,
+    
+    /// Table of contents shows directories only
+    #[arg(long = "toc-dirs-only", help_heading = "Output Format")]
+    pub toc_dirs_only: bool,
+    
+    /// Table of contents shows files and directories
+    #[arg(long = "toc-files", help_heading = "Output Format")]
+    pub toc_files: bool,
+    
     // Other
     /// Read null-separated paths from stdin
     #[arg(short = '0', long = "null", help_heading = "Other")]
@@ -130,6 +142,9 @@ Output Format:
   -m, --markdown           Output as Markdown code blocks
   -n, --line-numbers       Add line numbers
   -o, --output <FILE>      Save to file instead of printing
+      --toc                Include table of contents tree (auto: files+dirs if <100 lines, dirs only if ≥100)
+      --toc-dirs-only      Table of contents shows directories only
+      --toc-files          Table of contents shows files and directories
 
 Other:
   -0, --null               Read null-separated paths from stdin
@@ -194,6 +209,25 @@ pub fn run() -> Result<()> {
         }
     }
     
+    // Validate table of contents flags
+    if args.toc_dirs_only && args.toc_files {
+        eprintln!("Error: Cannot specify both --toc-dirs-only and --toc-files");
+        std::process::exit(1);
+    }
+    
+    // Determine table of contents mode
+    let toc_mode = if args.table_of_contents || args.toc_dirs_only || args.toc_files {
+        if args.toc_files {
+            Some(crate::TocMode::FilesAndDirs)
+        } else if args.toc_dirs_only {
+            Some(crate::TocMode::DirsOnly)
+        } else {
+            Some(crate::TocMode::Auto)
+        }
+    } else {
+        None
+    };
+    
     // Create file processor
     let processor = FileProcessor::new(
         args.extensions,
@@ -202,6 +236,7 @@ pub fn run() -> Result<()> {
         args.ignore_gitignore,
         args.ignore_patterns,
         args.line_numbers,
+        toc_mode,
     );
     
     // Determine output format and process files

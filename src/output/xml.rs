@@ -45,6 +45,15 @@ impl OutputFormatter for XmlFormatter {
         output
     }
     
+    fn format_table_of_contents(&mut self, toc: &str) -> String {
+        format!(
+            r#"<table_of_contents>
+{}
+</table_of_contents>"#,
+            toc
+        )
+    }
+    
     fn start_output(&mut self) -> String {
         "<documents>".to_string()
     }

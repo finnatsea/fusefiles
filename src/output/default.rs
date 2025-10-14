@@ -29,6 +29,10 @@ impl OutputFormatter for DefaultFormatter {
         format!("{}\n---\n{}\n\n---", path.display(), content)
     }
     
+    fn format_table_of_contents(&mut self, toc: &str) -> String {
+        format!("Table of Contents\n---\n{}\n\n---", toc)
+    }
+    
     fn start_output(&mut self) -> String {
         String::new()
     }

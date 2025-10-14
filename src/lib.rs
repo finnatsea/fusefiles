@@ -34,6 +34,17 @@ pub enum FilesToPromptError {
 /// Result type alias for the files-to-prompt application
 pub type Result<T> = std::result::Result<T, FilesToPromptError>;
 
+/// Table of contents mode for tree generation
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum TocMode {
+    /// Auto-detect based on estimated output size (files+dirs if <100 lines, dirs only if ≥100)
+    Auto,
+    /// Show directories only
+    DirsOnly,
+    /// Show files and directories
+    FilesAndDirs,
+}
+
 // Public modules
 pub mod cli;
 pub mod file_processor;
@@ -41,7 +52,9 @@ pub mod output;
 pub mod ignore;
 pub mod extensions;
 pub mod utils;
+pub mod tree;
 
 // Re-exports for convenience
 pub use file_processor::FileProcessor;
 pub use output::{OutputFormatter, DefaultFormatter, XmlFormatter, MarkdownFormatter};
+pub use tree::{TreeGenerator, TreeNode};
