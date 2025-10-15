@@ -147,12 +147,14 @@ fn test_ignore_gitignore() {
         .to_string()
         .to_string();
     let expected_nested_included = test_dir
-        .join("nested_include/included2.txt")
+        .join("nested_include")
+        .join("included2.txt")
         .to_string_lossy()
         .to_string()
         .to_string();
     let expected_actually_include = test_dir
-        .join("nested_ignore/actually_include.txt")
+        .join("nested_ignore")
+        .join("actually_include.txt")
         .to_string_lossy()
         .to_string()
         .to_string();
@@ -191,17 +193,20 @@ fn test_ignore_gitignore() {
         .to_string()
         .to_string();
     let expected_nested_included = test_dir
-        .join("nested_include/included2.txt")
+        .join("nested_include")
+        .join("included2.txt")
         .to_string_lossy()
         .to_string()
         .to_string();
     let expected_nested_ignored = test_dir
-        .join("nested_ignore/nested_ignore.txt")
+        .join("nested_ignore")
+        .join("nested_ignore.txt")
         .to_string_lossy()
         .to_string()
         .to_string();
     let expected_actually_include = test_dir
-        .join("nested_ignore/actually_include.txt")
+        .join("nested_ignore")
+        .join("actually_include.txt")
         .to_string_lossy()
         .to_string()
         .to_string();
@@ -320,7 +325,7 @@ fn test_specific_extensions() {
 
     let stdout = String::from_utf8(output).unwrap();
     let expected_one_py = test_dir.join("one.py").to_string_lossy().to_string();
-    let expected_two_py = test_dir.join("two/two.py").to_string_lossy().to_string();
+    let expected_two_py = test_dir.join("two").join("two.py").to_string_lossy().to_string();
     let expected_three_md = test_dir.join("three.md").to_string_lossy().to_string();
     assert!(!stdout.contains(".txt"));
     assert!(stdout.contains(&expected_one_py));
