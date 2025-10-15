@@ -9,6 +9,7 @@ repository = "https://github.com/finnatsea/fusefiles"
 readme = "README.md"
 keywords = ["cli", "files", "prompt", "llm", "concatenate"]
 categories = ["command-line-utilities", "text-processing"]
+exclude = ["files-to-prompt/", "docs/", ".vscode/", ".claude/"]
 
 [[bin]]
 name = "fuse"

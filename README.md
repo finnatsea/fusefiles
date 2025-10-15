@@ -1,5 +1,9 @@
 # fusefiles
 
+[![Crates.io](https://img.shields.io/crates/v/fusefiles.svg)](https://crates.io/crates/fusefiles)
+[![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
+[![CI](https://github.com/finnatsea/fusefiles/workflows/CI/badge.svg)](https://github.com/finnatsea/fusefiles/actions)
+
 A Rust CLI tool that concatenates files into a single prompt for use with LLMs. Inspired by Simon Willison's [files-to-prompt](https://github.com/simonw/files-to-prompt) but faster and with more features, like including a file tree at the top of the single file.
 
 **CLI command:** `fuse` (clean and simple!)
