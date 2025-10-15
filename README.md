@@ -4,9 +4,35 @@
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 [![CI](https://github.com/finnatsea/fusefiles/workflows/CI/badge.svg)](https://github.com/finnatsea/fusefiles/actions)
 
-A Rust CLI tool that concatenates files into a single prompt for use with LLMs. Inspired by Simon Willison's [files-to-prompt](https://github.com/simonw/files-to-prompt) but faster and with more features, like including a file tree at the top of the single file.
+A CLI tool that concatenates files into a single prompt for use with LLMs.
 
-**CLI command:** `fuse` (clean and simple!)
+## What does it do?
+
+Both `fuse` and `fusefiles` work (use whichever you prefer!)
+You run `fuse src/ --toc` and get:
+
+```
+Table of Contents
+---
+└── src/
+    ├── cli.rs
+    ├── main.rs
+    ├── output/
+    │   ├── default.rs
+    │   ├── markdown.rs
+    │   └── xml.rs
+    ├── tree.rs
+    └── utils.rs
+
+---
+src/cli.rs
+---
+use clap::Parser;
+use std::fs::File;
+... (contents of all files concatenated)
+```
+
+The tool generates a **table of contents tree** showing your project structure, followed by the concatenated contents of all files. Perfect for feeding to LLMs like Claude or ChatGPT!
 
 ## How to Use
 
@@ -18,7 +44,7 @@ A Rust CLI tool that concatenates files into a single prompt for use with LLMs. 
 cargo install fusefiles
 ```
 
-This installs the `fuse` command.
+This installs both the `fuse` and `fusefiles` commands (they're aliases for the same tool).
 
 #### Build and Install from Source
 
@@ -30,7 +56,7 @@ cd fusefiles
 cargo install --path .
 ```
 
-This installs the binary to `~/.cargo/bin/fuse`, making it available system-wide.
+This installs both `fuse` and `fusefiles` to `~/.cargo/bin/`, making them available system-wide.
 
 #### Build Only (for development)
 
@@ -44,10 +70,10 @@ The executable will be in `target/release/fuse`.
 ### How do I use it?
 
 ```bash
-# Process a directory
+# Fuse all files in a directory
 fuse src/
 
-# Process multiple paths
+# Fuse multiple paths
 fuse src/ tests/ Cargo.toml
 
 # Only include Python and Rust files
@@ -65,7 +91,7 @@ fuse src/ -o output.txt
 # Exclude test files
 fuse src/ --ignore "*test*"
 
-# Include hidden files
+# Include hidden files (git ignored files are ignored by default)
 fuse . --include-hidden
 
 # Add line numbers
@@ -120,3 +146,5 @@ cargo fmt
 # Lint with clippy
 cargo clippy
 ```
+### Shoutout
+Inspired by Simon Willison's [files-to-prompt](https://github.com/simonw/files-to-prompt) but faster and with more features, like including a file tree at the top of the single file.
