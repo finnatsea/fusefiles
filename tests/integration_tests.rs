@@ -325,7 +325,11 @@ fn test_specific_extensions() {
 
     let stdout = String::from_utf8(output).unwrap();
     let expected_one_py = test_dir.join("one.py").to_string_lossy().to_string();
-    let expected_two_py = test_dir.join("two").join("two.py").to_string_lossy().to_string();
+    let expected_two_py = test_dir
+        .join("two")
+        .join("two.py")
+        .to_string_lossy()
+        .to_string();
     let expected_three_md = test_dir.join("three.md").to_string_lossy().to_string();
     assert!(!stdout.contains(".txt"));
     assert!(stdout.contains(&expected_one_py));
