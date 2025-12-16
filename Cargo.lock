@@ -227,7 +227,7 @@ dependencies = [
 
 [[package]]
 name = "fusefiles"
-version = "0.6.3"
+version = "0.6.4"
 dependencies = [
  "assert_cmd",
  "atty",
