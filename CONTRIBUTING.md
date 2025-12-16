@@ -134,6 +134,49 @@ Enhancement suggestions are welcome! Please open an issue with:
 
 Feel free to open an issue for any questions about contributing.
 
+## Releasing (Maintainers)
+
+Releases are automated via GitHub Actions. When you publish a GitHub release, CI will:
+
+1. Run tests
+2. Publish to [crates.io](https://crates.io/crates/fusefiles)
+3. Build binaries for Linux, macOS (Intel + ARM), and Windows
+4. Attach binaries to the GitHub release
+
+### Release Steps
+
+```bash
+# 1. Bump version in Cargo.toml
+#    Edit version = "X.Y.Z" to the new version
+
+# 2. Update Cargo.lock and verify
+cargo check
+cargo fmt --check
+cargo test
+
+# 3. Commit the version bump
+git add Cargo.toml Cargo.lock
+git commit -m "chore: bump version to X.Y.Z"
+git push origin master
+
+# 4. Create and push the tag
+git tag -a vX.Y.Z -m "Release vX.Y.Z"
+git push origin vX.Y.Z
+
+# 5. Create the GitHub release (triggers CI)
+gh release create vX.Y.Z --generate-notes
+```
+
+After step 5, CI handles publishing to crates.io and building/uploading release binaries automatically.
+
+### One-Time Setup
+
+The `CARGO_REGISTRY_TOKEN` secret must be configured in GitHub repository settings for crates.io publishing to work:
+
+1. Get your token from https://crates.io/settings/tokens
+2. Go to repository Settings → Secrets and variables → Actions
+3. Add secret: `CARGO_REGISTRY_TOKEN` with your token value
+
 ## License
 
 By contributing to fusefiles, you agree that your contributions will be licensed under the Apache 2.0 License.
