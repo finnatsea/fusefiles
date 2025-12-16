@@ -1,6 +1,6 @@
 [package]
 name = "fusefiles"
-version = "0.6.2"
+version = "0.6.3"
 edition = "2021"
 description = "Concatenate a directory full of files into a single prompt for use with LLMs"
 license = "Apache-2.0"
