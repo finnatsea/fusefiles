@@ -9,25 +9,60 @@ use crate::output::{DefaultFormatter, MarkdownFormatter, XmlFormatter};
 use crate::utils::read_paths_from_stdin;
 use crate::{FileProcessor, Result};
 
-/// fusefiles: Turn many files -> single file, useful for LLM prompting
-#[derive(Parser)]
-#[command(name = "fuse")]
-#[command(about = "Turn many files -> single file, useful for LLM prompting.")]
-#[command(
-    long_about = r#"Turn many files -> single file, useful for LLM prompting.
+// ============================================================================
+// Shared documentation pieces (single source of truth)
+// ============================================================================
 
+const DESCRIPTION: &str = "Turn many files -> single file, useful for LLM prompting.";
+
+const USAGE: &str = "\
 Usage:
   fuse [path/to/file_or_directory] [options]
+  fuse [file1] [file2] [folder1] [folder2] [options]";
 
-Here's a few samples to get started:
+const EXAMPLES: &str = r#"Here's a few samples to get started:
   fuse src/                                      # All files in src/
-  fuse src/ test/ -e ts                          # All ts files in src/ and test
-  fuse hello.text test/ -e rs -e toml            # hello file and .rs and .toml files in test
+  fuse src/ test/ -e ts                          # Only .ts files in src/ and test
+  fuse src/ --toc-files --ignore "__tests__"     # Files in src/ except __tests__, with toc tree
   fuse . --ignore "*.log" --ignore "test_*"      # Skip logs and files that start with "test_"
-  fuse . -o output.txt                           # Save to file instead of printing or use >
+  fuse . -o output.txt                           # Save to file instead of printing or use >"#;
 
-For a full list of options, run `fuse help`."#
-)]
+const OPTIONS_HELP: &str = "\
+OPTIONS
+Input Control:
+  -e, --extension <EXT>     Only include these extensions (e.g. -e py -e js)
+      --include-hidden      Include hidden files (starting with .)
+      --ignore-files-only   Make --ignore patterns skip files only, not directories
+      --ignore-gitignore    Don't use .gitignore rules
+      --ignore <PATTERN>    Skip files matching pattern (*.log, test_*, *foo*, __pycache__)
+
+Output Format:
+  -c, --cxml               Output in Claude XML format
+  -m, --markdown           Output as Markdown code blocks
+  -n, --line-numbers       Add line numbers
+  -o, --output <FILE>      Save to file instead of printing
+      --toc                Include table of contents tree (auto: files+dirs if <100 lines, dirs only if ≥100)
+      --toc-dirs-only      Table of contents shows directories only
+      --toc-files          Table of contents shows files and directories
+
+Other:
+  -0, --null               Read null-separated paths from stdin
+  -h, --help               Print help
+  -V, --version            Print version";
+
+const PATTERN_USAGE: &str = r#"Pattern Usage:
+  --ignore "test_*"        → Matches: test_utils.py, test_data.json
+  --ignore "*.log"         → Matches: debug.log, error.log
+  --ignore "*foo*"         → Matches: foo.txt, config_foo_bar.xml
+  --ignore "__init__.py"   → Matches: any file/folder named exactly "__init__.py""#;
+
+// ============================================================================
+// CLI definition
+// ============================================================================
+
+#[derive(Parser)]
+#[command(name = "fuse")]
+#[command(about = DESCRIPTION)]
 #[command(version)]
 #[command(disable_help_flag = true)]
 #[command(disable_version_flag = true)]
@@ -105,68 +140,12 @@ pub struct Cli {
     pub version: Option<bool>,
 }
 
-const SHORT_HELP_TEXT: &str = r#"Turn many files -> single file, useful for LLM prompting.
-
-Usage:
-  fuse [path/to/file_or_directory] [options]
-
-Here's a few samples to get started:
-  fuse src/                                      # All files in src/
-  fuse src/ test/ -e ts                          # All ts files in src/ and test
-  fuse hello.text test/ -e rs -e toml            # hello file and .rs and .toml files in test
-  fuse . --ignore "*.log" --ignore "test_*"      # Skip logs and files that start with "test_"
-  fuse . -o output.txt                           # Save to file instead of printing or use >
-
-For a full list of options, run `fuse --help`."#;
-
-const FULL_HELP_TEXT: &str = r#"Turn many files -> single file, useful for LLM prompting.
-
-Usage:
-  fuse [path/to/file_or_directory] [options]
-
-Here's a few samples to get started:
-  fuse src/                                      # All files in src/
-  fuse src/ test/ -e ts                          # All ts files in src/ and test
-  fuse hello.text test/ -e rs -e toml            # hello file and .rs and .toml files in test
-  fuse . --ignore "*.log" --ignore "test_*"      # Skip logs and files that start with "test_"
-  fuse . -o output.txt                           # Save to file instead of printing or use >
-
-For a full list of options, run `fuse --help`.
-
-OPTIONS
-Input Control:
-  -e, --extension <EXT>     Only include these extensions (e.g. -e py -e js)
-      --include-hidden      Include hidden files (starting with .)
-      --ignore-files-only   Make --ignore patterns skip files only, not directories
-      --ignore-gitignore    Don't use .gitignore rules
-      --ignore <PATTERN>    Skip files matching pattern (*.log, test_*, *foo*, __pycache__)
-
-Output Format:
-  -c, --cxml               Output in Claude XML format
-  -m, --markdown           Output as Markdown code blocks
-  -n, --line-numbers       Add line numbers
-  -o, --output <FILE>      Save to file instead of printing
-      --toc                Include table of contents tree (auto: files+dirs if <100 lines, dirs only if ≥100)
-      --toc-dirs-only      Table of contents shows directories only
-      --toc-files          Table of contents shows files and directories
-
-Other:
-  -0, --null               Read null-separated paths from stdin
-  -h, --help               Print help
-  -V, --version            Print version
-
-Pattern Usage:
-  --ignore "test_*"        → Matches: test_utils.py, test_data.json
-  --ignore "*.log"         → Matches: debug.log, error.log
-  --ignore "*foo*"         → Matches: foo.txt, config_foo_bar.xml
-  --ignore "__init__.py"   → Matches: any file/folder named exactly "__init__.py""#;
-
 fn print_short_help() {
-    println!("{}", SHORT_HELP_TEXT);
+    println!("{DESCRIPTION}\n\n{USAGE}\n\n{EXAMPLES}\n\nFor a full list of options, run `fuse --help`.");
 }
 
 fn print_full_help() {
-    println!("{}", FULL_HELP_TEXT);
+    println!("{DESCRIPTION}\n\n{USAGE}\n\n{EXAMPLES}\n\n{OPTIONS_HELP}\n\n{PATTERN_USAGE}");
 }
 
 /// Main entry point for the CLI application

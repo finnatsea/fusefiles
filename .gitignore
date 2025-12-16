@@ -8,3 +8,4 @@ rust-implementation-plan.md
 .vscode
 .claude
 *.log
+.DS_Store
