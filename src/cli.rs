@@ -141,7 +141,9 @@ pub struct Cli {
 }
 
 fn print_short_help() {
-    println!("{DESCRIPTION}\n\n{USAGE}\n\n{EXAMPLES}\n\nFor a full list of options, run `fuse --help`.");
+    println!(
+        "{DESCRIPTION}\n\n{USAGE}\n\n{EXAMPLES}\n\nFor a full list of options, run `fuse --help`."
+    );
 }
 
 fn print_full_help() {
