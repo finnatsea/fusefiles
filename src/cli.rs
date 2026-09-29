@@ -2,17 +2,14 @@
 
 use clap::Parser;
 use std::fs::File;
-use std::io::Write;
+use std::io::{self, IsTerminal, Write};
 use std::path::PathBuf;
 
 use crate::output::{DefaultFormatter, MarkdownFormatter, XmlFormatter};
 use crate::utils::read_paths_from_stdin;
 use crate::{FileProcessor, Result};
 
-// ============================================================================
-// Shared documentation pieces (single source of truth)
-// ============================================================================
-
+// Single source of truth for text blocks
 const DESCRIPTION: &str = "Turn many files -> single file, useful for LLM prompting.";
 
 const USAGE: &str = "\
@@ -21,59 +18,38 @@ Usage:
   fuse [file1] [file2] [folder1] [folder2] [options]";
 
 const EXAMPLES: &str = r#"Here's a few samples to get started:
-  fuse src/                                      # All files in src/
-  fuse src/ test/ -e ts                          # Only .ts files in src/ and test
-  fuse src/ --toc-files --ignore "__tests__"     # Files in src/ except __tests__, with toc tree
-  fuse . --ignore "*.log" --ignore "test_*"      # Skip logs and files that start with "test_"
-  fuse . -o output.txt                           # Save to file instead of printing or use >"#;
-
-const OPTIONS_HELP: &str = "\
-OPTIONS
-Input Control:
-  -e, --extension <EXT>     Only include these extensions (e.g. -e py -e js)
-      --include-hidden      Include hidden files (starting with .)
-      --ignore-files-only   Make --ignore patterns skip files only, not directories
-      --ignore-gitignore    Don't use .gitignore rules
-      --ignore <PATTERN>    Skip files matching pattern (*.log, test_*, *foo*, __pycache__)
-
-Output Format:
-  -c, --cxml               Output in Claude XML format
-  -m, --markdown           Output as Markdown code blocks
-  -n, --line-numbers       Add line numbers
-  -o, --output <FILE>      Save to file instead of printing
-      --toc                Include table of contents tree (auto: files+dirs if <100 lines, dirs only if ≥100)
-      --toc-dirs-only      Table of contents shows directories only
-      --toc-files          Table of contents shows files and directories
-
-Other:
-  -0, --null               Read null-separated paths from stdin
-  -h, --help               Print help
-  -V, --version            Print version";
+  fuse src/                                       # All files in src/
+  fuse src/ test/ -e ts                           # Only .ts files in src/ and test
+  fuse src/ --toc-files --ignore "__tests__"      # Files in src/ except __tests__, with toc tree
+  fuse . --ignore "*.log" --ignore "test_*"       # Skip logs and files that start with "test_"
+  fuse . -o output.txt                            # Save to file instead of printing or use >"#;
 
 const PATTERN_USAGE: &str = r#"Pattern Usage:
   --ignore "test_*"        → Matches: test_utils.py, test_data.json
-  --ignore "*.log"         → Matches: debug.log, error.log
-  --ignore "*foo*"         → Matches: foo.txt, config_foo_bar.xml
+  --ignore "*.log"          → Matches: debug.log, error.log
+  --ignore "*foo*"          → Matches: foo.txt, config_foo_bar.xml
   --ignore "__init__.py"   → Matches: any file/folder named exactly "__init__.py""#;
 
-// ============================================================================
-// CLI definition
-// ============================================================================
-
 #[derive(Parser)]
-#[command(name = "fuse")]
-#[command(about = DESCRIPTION)]
-#[command(version)]
-#[command(disable_help_flag = true)]
-#[command(disable_version_flag = true)]
+#[command(
+    name = "fuse",
+    about = DESCRIPTION,
+    version,
+    disable_help_flag = true,
+    disable_version_flag = true
+)]
 pub struct Cli {
     /// Files or directories to include
     #[arg(value_name = "PATHS")]
     pub paths: Vec<PathBuf>,
 
     /// Show full help message
-    #[arg(long = "help", short = 'h')]
+    #[arg(short = 'h', long = "help")]
     pub help: bool,
+
+    /// Print version
+    #[arg(short = 'V', long = "version")]
+    pub version: bool,
 
     // Input Control
     /// Only include these extensions (e.g. -e py -e js)
@@ -110,12 +86,7 @@ pub struct Cli {
     pub line_numbers: bool,
 
     /// Save to file instead of printing
-    #[arg(
-        short = 'o',
-        long = "output",
-        value_name = "FILE",
-        help_heading = "Output Format"
-    )]
+    #[arg(short = 'o', long = "output", value_name = "FILE", help_heading = "Output Format")]
     pub output_file: Option<PathBuf>,
 
     /// Include table of contents tree (auto: files+dirs if <100 lines, dirs only if ≥100)
@@ -134,69 +105,55 @@ pub struct Cli {
     /// Read null-separated paths from stdin
     #[arg(short = '0', long = "null", help_heading = "Other")]
     pub null_separator: bool,
-
-    /// Print version
-    #[arg(short = 'V', long = "version", action = clap::ArgAction::Version, help_heading = "Other")]
-    pub version: Option<bool>,
 }
 
 fn print_short_help() {
-    println!(
-        "{DESCRIPTION}\n\n{USAGE}\n\n{EXAMPLES}\n\nFor a full list of options, run `fuse --help`."
-    );
+    println!("{DESCRIPTION}\n\n{USAGE}\n\n{EXAMPLES}\n\nFor a full list of options, run `fuse --help`.");
 }
 
 fn print_full_help() {
-    println!("{DESCRIPTION}\n\n{USAGE}\n\n{EXAMPLES}\n\n{OPTIONS_HELP}\n\n{PATTERN_USAGE}");
+    // Generate help via Clap directly or display custom help output
+    println!("{DESCRIPTION}\n\n{USAGE}\n\n{EXAMPLES}\n\n{PATTERN_USAGE}");
 }
 
-/// Main entry point for the CLI application
 pub fn run() -> Result<()> {
-    let raw_args: Vec<String> = std::env::args().collect();
-
-    // Handle special cases before parsing
-    if raw_args.len() == 1 {
-        // No arguments provided, show short help
+    // Check if run without flags/args interactively before running parser
+    if std::env::args().len() == 1 && io::stdin().is_terminal() {
         print_short_help();
-        return Ok(());
-    }
-
-    // Check for help argument
-    if raw_args
-        .iter()
-        .any(|arg| arg == "help" || arg == "--help" || arg == "-h")
-    {
-        print_full_help();
-        return Ok(());
-    }
-
-    // Check for version argument
-    if raw_args.iter().any(|arg| arg == "--version" || arg == "-V") {
-        println!("{}", env!("CARGO_PKG_VERSION"));
         return Ok(());
     }
 
     let args = Cli::parse();
 
+    if args.help {
+        print_full_help();
+        return Ok(());
+    }
+
+    if args.version {
+        println!("{}", env!("CARGO_PKG_VERSION"));
+        return Ok(());
+    }
+
     // Combine paths from arguments and stdin
     let mut all_paths = args.paths.clone();
 
-    // Only read from stdin if no paths were provided via command line
-    // This prevents stdin from being read when paths are already specified
     if all_paths.is_empty() {
         let stdin_paths = read_paths_from_stdin(args.null_separator)?;
-        for path in stdin_paths {
-            all_paths.push(PathBuf::from(path));
-        }
+        all_paths.extend(stdin_paths.into_iter().map(PathBuf::from));
     }
 
-    // Validate that we have at least one path
+    // Validate path count
     if all_paths.is_empty() {
-        print_short_help();
+        if io::stdin().is_terminal() {
+            print_short_help();
+        } else {
+            eprintln!("Error: No paths provided on command line or via stdin.");
+        }
         std::process::exit(1);
     }
 
-    // Validate that all paths exist
+    // Validate path existence
     for path in &all_paths {
         if !path.exists() {
             eprintln!("Path does not exist: {}", path.display());
@@ -204,13 +161,12 @@ pub fn run() -> Result<()> {
         }
     }
 
-    // Validate table of contents flags
+    // Validate TOC options
     if args.toc_dirs_only && args.toc_files {
         eprintln!("Error: Cannot specify both --toc-dirs-only and --toc-files");
         std::process::exit(1);
     }
 
-    // Determine table of contents mode
     let toc_mode = if args.table_of_contents || args.toc_dirs_only || args.toc_files {
         if args.toc_files {
             Some(crate::TocMode::FilesAndDirs)
@@ -223,7 +179,6 @@ pub fn run() -> Result<()> {
         None
     };
 
-    // Create file processor
     let processor = FileProcessor::new(
         args.extensions,
         args.include_hidden,
@@ -234,7 +189,6 @@ pub fn run() -> Result<()> {
         toc_mode,
     )?;
 
-    // Determine output format and process files
     let output = if args.claude_xml {
         let mut formatter = XmlFormatter::new();
         processor.process_paths(&all_paths, &mut formatter)?
@@ -246,7 +200,6 @@ pub fn run() -> Result<()> {
         processor.process_paths(&all_paths, &mut formatter)?
     };
 
-    // Write output
     if let Some(output_path) = args.output_file {
         let mut file = File::create(output_path)?;
         file.write_all(output.as_bytes())?;
